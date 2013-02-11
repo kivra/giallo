@@ -118,12 +118,12 @@ try_fun(Fun, Req, Handler, Action, Arity, Env) ->
 
 render_template(Req0, Variables, Env) ->
     F = fun() ->
-    {PathInfo, Req1} = cowboy_req:path_info(Req0),
-    Template = binary_to_list(hd(PathInfo)),
-    {ok, Response} =
-                apply(list_to_atom(Template ++ "_dtl"), render,
-                     [Variables]),
-    {ok, Response, Req1}
+            {PathInfo, Req1} = cowboy_req:path_info(Req0),
+            Template = binary_to_list(hd(PathInfo)),
+            {ok, Response} =
+                             apply(list_to_atom(Template ++ "_dtl"), render,
+                                   [Variables]),
+            {ok, Response, Req1}
     end,
     try_fun(F, Req0, erlydtl, render, 1, Env).
 
