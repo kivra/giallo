@@ -46,10 +46,7 @@ start(Dispatch, Env) ->
             ]).
 
 stop() ->
-    application:stop(giallo),
-    application:stop(cowboy),
-    application:stop(ranch),
-    application:stop(crypto).
+    application:stop(giallo).
 
 %% Private --------------------------------------------------------------------
 

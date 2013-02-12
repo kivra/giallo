@@ -56,6 +56,7 @@
 all() ->
     [
         {group, minimal},
+        {group, subpath},
         {group, default}
     ].
 
@@ -69,17 +70,18 @@ groups() ->
             hello_world,
             hello_world_template,
             hello_world_template_var,
-            subpath_hi_world,
             not_found,
             render_other,
             error_500
     ],
     [
         {minimal, [], [minimal]},
+        {subpath, [], [subpath_hi_world]},
         {default, [], Tests}
     ].
 
 init_per_suite(Config) ->
+    application:start(crypto),
     application:start(inets),
     Config.
 
@@ -87,19 +89,35 @@ end_per_suite(_Config) ->
     inets:stop(),
     ok.
 
+giallo_init() ->
+    application:start(ranch),
+    application:start(cowboy),
+    application:start(giallo).
+
 init_per_group(minimal, Config) ->
+    giallo_init(),
     Dispatch = [
                 {'_', [
-                        {"/[...]", minimal_handler, []}
+                        {"/", minimal_handler, []}
                       ]
                 }
                ],
     giallo:start(Dispatch),
     Config;
 init_per_group(default, Config) ->
+    giallo_init(),
     Dispatch = [
                 {'_', [
-                        {"/[...]", default_handler, []},
+                        {"/[...]", default_handler, []}
+                      ]
+                }
+               ],
+    giallo:start(Dispatch),
+    Config;
+init_per_group(subpath, Config) ->
+    giallo_init(),
+    Dispatch = [
+                {'_', [
                         {"/subpath/[...]", default_handler, []}
                       ]
                 }
@@ -108,7 +126,9 @@ init_per_group(default, Config) ->
     Config.
 
 end_per_group(_, _Config) ->
-    giallo:stop().
+    application:stop(giallo),
+    application:stop(cowboy),
+    application:stop(ranch).
 
 %% Tests ----------------------------------------------------------------------
 
@@ -198,7 +218,7 @@ error_500(Config) ->
 
 minimal(Config) ->
     Url = base_url(Config),
-    {ok, {Status, Headers, Body}} = httpc:request(Url ++ "hi/you"),
+    {ok, {Status, Headers, Body}} = httpc:request(Url),
     {"HTTP/1.1", 200, "OK"} = Status,
     "Ohai!" = Body,
     {"content-type", "text/html"} = lists:keyfind("content-type", 1, Headers).

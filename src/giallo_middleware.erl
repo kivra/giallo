@@ -87,18 +87,21 @@ handler_handle(Handler, Action, PathInfo, Arguments, Req0, Env) ->
 
 get_function_name(_Handler, undefined) ->
     index_;
-get_function_name(_Handler, []) ->
-    index_;
+get_function_name(Handler, []) ->
+    ensure_action(Handler, "index_");
 get_function_name(Handler, PathInfo) ->
     Function = binary_to_list(hd(PathInfo)),
     try list_to_existing_atom(Function)
     catch _:_ ->
-            Prefix = atom_to_list(Handler),
-            Template = list_to_atom(Prefix ++ "_" ++ Function ++ "_dtl"),
-            case code:ensure_loaded(Template) of
-                {module, Template} -> list_to_atom(Function);
-                {error, _Reason}   -> undefined
-            end
+            ensure_action(Handler, Function)
+    end.
+
+ensure_action(Handler, Function) ->
+    Prefix = atom_to_list(Handler),
+    Template = list_to_atom(Prefix ++ "_" ++ Function ++ "_dtl"),
+    case code:ensure_loaded(Template) of
+        {module, Template} -> list_to_atom(Function);
+        {error, _Reason}   -> undefined
     end.
 
 get_extra([]) ->

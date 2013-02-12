@@ -26,9 +26,9 @@
 
 -module(minimal_handler).
 
--export([hi/4]).
+-export([index_/4]).
 
 %% API ------------------------------------------------------------------------
 
-hi(<<"GET">>, [<<"you">>], _Extra, _Req) ->
-	{output, <<"Ohai!">>}.
+index_(<<"GET">>, [], _Extra, _Req) ->
+    {output, <<"Ohai!">>}.
