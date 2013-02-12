@@ -32,13 +32,29 @@
 
 %% API ------------------------------------------------------------------------
 
--spec execute(Req, Env)
-	-> {ok, Req, Env} | {error, 500, Req}
-	when Req::cowboy_req:req(), Env::cowboy_middleware:env().
-execute(Req, Env) ->
+-spec execute(Req0, Env) ->
+    {ok, Req, Env} | {error, 500, Req} | {halt, Req} when
+    Req0 :: cowboy_req:req()
+    ,Req :: cowboy_req:req()
+    ,Env :: cowboy_middleware:env().
+execute(Req0, Env) ->
     {handler, Handler} = lists:keyfind(handler, 1, Env),
-    giallo_response:eval(maybe_do_handler(Handler, Req, Env), Req, Env).
+    {handler_opts, Arguments} = lists:keyfind(handler_opts, 1, Env),
+    case get_action(Handler, Req0) of
+        continue       -> {ok, Req0, Env};
+        {Req1, Action} ->
+           execute_handler(Handler, Action, Arguments, Req1, Env)
+    end.
 
+
+-spec execute_handler(Handler, Action, Arguments, Req0, Env) ->
+    {ok, Req, Env} | {error, 500, Req} | {halt, Req} when
+    Handler    :: module()
+    ,Action    :: atom()
+    ,Arguments :: proplists:proplist()
+    ,Req0      :: cowboy_req:req()
+    ,Req       :: cowboy_req:req()
+    ,Env       :: cowboy_middleware:env().
 execute_handler(Handler, Action, Arguments, Req0, Env) ->
     {PathInfo, Req1} = cowboy_req:path_info(Req0),
     Extra = get_extra(PathInfo),
@@ -47,34 +63,47 @@ execute_handler(Handler, Action, Arguments, Req0, Env) ->
 
 %% Private --------------------------------------------------------------------
 
-maybe_do_handler(Handler, Req0, Env) ->
+get_action(Handler, Req0) ->
     {PathInfo, Req1} = cowboy_req:path_info(Req0),
-    {handler_opts, Arguments} = lists:keyfind(handler_opts, 1, Env),
-    Extra = get_extra(PathInfo),
-    case get_function_name(PathInfo) of
+    case get_function_name(Handler, PathInfo) of
         undefined -> continue;
-        Action    ->
-            handler_handle(Handler, Action, Extra, Arguments, Req1, Env)
+        Action    -> {Req1, Action}
     end.
 
 handler_handle(Handler, Action, PathInfo, Arguments, Req0, Env) ->
-    case erlang:function_exported(Handler, Action, 4) of
-        true ->
-            F = fun() ->
-                    {Method, Req1} = cowboy_req:method(Req0),
-                    apply(Handler, Action, [Method, PathInfo, Arguments, Req1])
-            end,
-            giallo_response:try_fun(F, Req0, Handler, 4, Action, Env);
-        false -> continue
+    case code:ensure_loaded(Handler) of
+        {module, Handler} ->
+            case erlang:function_exported(Handler, Action, 4) of
+                true ->
+                    F = fun() ->
+                            {Method, Req1} = cowboy_req:method(Req0),
+                            apply(Handler, Action, [Method, PathInfo, Arguments, Req1])
+                    end,
+                    giallo_response:try_fun(F, Req0, Handler, 4, Action, Env);
+                false -> ok
+            end;
+        {error, _Reason} -> continue
     end.
 
-get_function_name(PathInfo) ->
-    try list_to_existing_atom(binary_to_list(hd(PathInfo)))
+get_function_name(_Handler, undefined) ->
+    index_;
+get_function_name(_Handler, []) ->
+    index_;
+get_function_name(Handler, PathInfo) ->
+    Function = binary_to_list(hd(PathInfo)),
+    try list_to_existing_atom(Function)
     catch _:_ ->
-            undefined
+            Prefix = atom_to_list(Handler),
+            Template = list_to_atom(Prefix ++ "_" ++ Function ++ "_dtl"),
+            case code:ensure_loaded(Template) of
+                {module, Template} -> list_to_atom(Function);
+                {error, _Reason}   -> undefined
+            end
     end.
 
 get_extra([]) ->
+    [];
+get_extra(undefined) ->
     [];
 get_extra(PathInfo) ->
     tl(PathInfo).

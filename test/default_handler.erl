@@ -46,18 +46,18 @@
 
 %% Standard Cowboy callback handlers
 init(_Transport, Req, []) ->
-	{ok, Req, undefined}.
+    {ok, Req, undefined}.
 
 handle(Req, State) ->
-	{ok, Req2} = cowboy_req:reply(200, [], <<"Hello World!">>, Req),
-	{ok, Req2, State}.
+    {ok, Req2} = cowboy_req:reply(200, [], <<"Hello World!">>, Req),
+    {ok, Req2, State}.
 
 terminate(_Reason, _Req, _State) ->
-	ok.
+    ok.
 
 %% Giallo callback handlers
 hi(<<"GET">>, [<<"you">>], _Extra, _Req) ->
-	{output, <<"Ohai!">>};
+    {output, <<"Ohai!">>};
 hi(<<"GET">>, [<<"json">>], _Extra, _Req) ->
     {json, [{<<"jason">>, <<"Ohai!">>}]};
 hi(<<"GET">>, [<<"jsonp">>], _Extra, _Req) ->
@@ -74,7 +74,7 @@ render_other(<<"GET">>, _Pathinfo, _Extra, _Req) ->
                     {controller, default_handler}]}.
 
 render_other_landing(<<"GET">>, [], _Extra, _Req) ->
-	{output, <<"You got rendered!">>}.
+    {output, <<"You got rendered!">>}.
 
 not_found(<<"GET">>, _Pathinfo, _Extra, _Req) ->
     not_found.

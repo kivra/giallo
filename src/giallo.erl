@@ -36,11 +36,6 @@ start(Dispatch) ->
     start(Dispatch, []).
 
 start(Dispatch, Env) ->
-    application:start(crypto),
-    application:start(ranch),
-    application:start(cowboy),
-    application:load(giallo),
-
     CompiledDispatch = cowboy_router:compile(Dispatch),
     {ok, Acceptors} = get_env(acceptors, Env),
     {ok, Port} = get_env(port, Env),
@@ -48,8 +43,7 @@ start(Dispatch, Env) ->
             {env, [{dispatch, CompiledDispatch}]},
             {middlewares, [cowboy_router, giallo_middleware,
                            cowboy_handler]}
-            ]),
-    ok = application:start(giallo).
+            ]).
 
 stop() ->
     application:stop(giallo),

@@ -40,8 +40,9 @@ eval(ok, Req0, Env) ->
 eval({ok, Variables}, Req0, Env) ->
     eval({ok, Variables, []}, Req0, Env);
 eval({ok, Variables, Headers}, Req0, Env) ->
-    {ok, Response, Req1} = render_template(Req0, Variables, Env),
-    eval({output, Response, Headers}, Req1, Env);
+    Response = render_template(Req0, get_value(handler, Env),
+                               Variables, Headers, Env),
+    eval(Response, Req0, Env);
 eval({redirect, Location}, Req0, Env) ->
     eval({redirect, Location, []}, Req0, Env);
 eval({redirect, Location, Headers}, Req0, _Env) ->
@@ -104,28 +105,35 @@ try_fun(Fun, Req, Handler, Action, Arity, Env) ->
     try Fun()
     catch Class:Reason ->
             error_logger:error_msg(
-			"** Giallo handler ~p terminating in ~p/~p~n"
-			"   for the reason ~p:~p~n"
-			"** Handler state was ~p~n"
-			"** Request was ~p~n"
-			"** Stacktrace: ~p~n~n",
-			[Handler, Action, Arity, Class, Reason, Env,
-				cowboy_req:to_list(Req), erlang:get_stacktrace()]),
+            "** Giallo handler ~p terminating in ~p/~p~n"
+            "   for the reason ~p:~p~n"
+            "** Handler state was ~p~n"
+            "** Request was ~p~n"
+            "** Stacktrace: ~p~n~n",
+            [Handler, Action, Arity, Class, Reason, Env,
+                cowboy_req:to_list(Req), erlang:get_stacktrace()]),
             {error, 500}
     end.
 
 %% Private --------------------------------------------------------------------
 
-render_template(Req0, Variables, Env) ->
+render_template(Req0, Handler, Variables, Headers, Env) ->
     F = fun() ->
-            {PathInfo, Req1} = cowboy_req:path_info(Req0),
-            Template = binary_to_list(hd(PathInfo)),
-            {ok, Response} =
-                             apply(list_to_atom(Template ++ "_dtl"), render,
-                                   [Variables]),
-            {ok, Response, Req1}
+            {PathInfo, _Req1} = cowboy_req:path_info(Req0),
+            Action = get_function_name(PathInfo),
+            Prefix = atom_to_list(Handler),
+            Template = list_to_atom(Prefix ++ "_" ++ Action ++ "_dtl"),
+            {ok, Response} = apply(Template, render, [Variables]),
+            {output, Response, Headers}
     end,
     try_fun(F, Req0, erlydtl, render, 1, Env).
+
+get_function_name(undefined) ->
+    "index_";
+get_function_name([]) ->
+    "index_";
+get_function_name(PathInfo) ->
+    binary_to_list(hd(PathInfo)).
 
 get_value(Key, List) ->
     get_value(Key, List, undefined).
