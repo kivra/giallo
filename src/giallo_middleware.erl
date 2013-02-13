@@ -73,16 +73,37 @@ get_action(Handler, Req0) ->
 handler_handle(Handler, Action, PathInfo, Arguments, Req0, Env) ->
     case code:ensure_loaded(Handler) of
         {module, Handler} ->
-            case erlang:function_exported(Handler, Action, 4) of
-                true ->
-                    F = fun() ->
-                            {Method, Req1} = cowboy_req:method(Req0),
-                            apply(Handler, Action, [Method, PathInfo, Arguments, Req1])
-                    end,
-                    giallo_response:try_fun(F, Req0, Handler, 4, Action, Env);
-                false -> ok
+            case maybe_do_before(Handler, Action, Req0, Env) of
+                {redirect, _Location} = Redirect ->
+                    Redirect;
+                {error, 500} = Error ->
+                    Error;
+                {ok, BeforeArgs} ->
+                    case erlang:function_exported(Handler, Action, 4) of
+                        true ->
+                            F = fun() ->
+                                    Parameters = Arguments ++ BeforeArgs,
+                                    {Method, Req1} = cowboy_req:method(Req0),
+                                    apply(Handler, Action, [Method,
+                                                            PathInfo,
+                                                            Parameters, Req1])
+                            end,
+                            giallo_response:try_fun(F, Req0, Handler, 4,
+                                                    Action, Env);
+                        false -> ok
+                    end
             end;
         {error, _Reason} -> continue
+    end.
+
+maybe_do_before(Handler, Action, Req0, Env) ->
+    case erlang:function_exported(Handler, before_, 2) of
+        true ->
+            F = fun() ->
+                    apply(Handler, before_, [Action, Req0])
+            end,
+            giallo_response:try_fun(F, Req0, Handler, 2, before_, Env);
+        false -> {ok, []}
     end.
 
 get_function_name(_Handler, undefined) ->
@@ -98,9 +119,10 @@ get_function_name(Handler, PathInfo) ->
 
 ensure_action(Handler, Function) ->
     Prefix = atom_to_list(Handler),
+    %% TODO: Possible atom leakage
     Template = list_to_atom(Prefix ++ "_" ++ Function ++ "_dtl"),
     case code:ensure_loaded(Template) of
-        {module, Template} -> list_to_atom(Function);
+        {module, Template} -> list_to_existing_atom(Function);
         {error, _Reason}   -> undefined
     end.
 

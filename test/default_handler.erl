@@ -34,6 +34,7 @@
 -export([terminate/3]).
 
 %% Giallo callback handlers
+-export([before_/2]).
 -export([hi/4]).
 -export([moved/4]).
 -export([redirect/4]).
@@ -56,6 +57,12 @@ terminate(_Reason, _Req, _State) ->
     ok.
 
 %% Giallo callback handlers
+before_(redirect_non_existent_action, _Req) ->
+    {redirect, [{action, render_other_landing},
+                {controller, default_handler}]};
+before_(_, _Req) ->
+    {ok, []}.
+
 hi(<<"GET">>, [<<"you">>], _Extra, _Req) ->
     {output, <<"Ohai!">>};
 hi(<<"GET">>, [<<"json">>], _Extra, _Req) ->

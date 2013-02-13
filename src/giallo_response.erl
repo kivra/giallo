@@ -43,24 +43,22 @@ eval({ok, Variables, Headers}, Req0, Env) ->
     Response = render_template(Req0, get_value(handler, Env),
                                Variables, Headers, Env),
     eval(Response, Req0, Env);
-eval({redirect, Location}, Req0, Env) ->
+eval({redirect, Location}, Req0, Env) when is_binary(Location) ->
     eval({redirect, Location, []}, Req0, Env);
+eval({redirect, Location}, Req0, Env) ->
+    render_other(Location, [], Req0, Env);
 eval({redirect, Location, Headers}, Req0, _Env) ->
-    {ok, Req1} =
-            cowboy_req:reply(302, [{<<"location">>, Location}], Headers, Req0),
-    {halt, Req1};
+    redirect_or_move(302, Location, Headers, Req0);
 eval({moved, Location}, Req0, Env) ->
     eval({moved, Location, []}, Req0, Env);
 eval({moved, Location, Headers}, Req0, _Env) ->
-    {ok, Req1} =
-            cowboy_req:reply(301, [{<<"location">>, Location}], Headers, Req0),
-    {halt, Req1};
-eval({render_other, OtherLocation}, Req0, Env) ->
-    eval({render_other, OtherLocation, []}, Req0, Env);
-eval({render_other, OtherLocation, Variables}, Req0, Env) ->
-    Action = get_value(action, OtherLocation),
-    Handler = get_value(controller, OtherLocation, get_value(handler, Env)),
-    giallo_middleware:execute_handler(Handler, Action, Variables, Req0, Env);
+    redirect_or_move(301, Location, Headers, Req0);
+eval({render_other, Location}, Req0, _Env) when is_binary(Location) ->
+    redirect_or_move(302, Location, [], Req0);
+eval({render_other, Location}, Req0, Env) ->
+    eval({render_other, Location, []}, Req0, Env);
+eval({render_other, Location, Variables}, Req0, Env) ->
+    render_other(Location, Variables, Req0, Env);
 eval({stream, Fun, Acc0}, Req0, Env) ->
     eval({stream, Fun, Acc0, []}, Req0, Env);
 eval({stream, _Fun, _Acc0, _Headers}, _Req0, _Env) ->
@@ -117,12 +115,22 @@ try_fun(Fun, Req, Handler, Action, Arity, Env) ->
 
 %% Private --------------------------------------------------------------------
 
+render_other(Location, Variables, Req, Env) ->
+    Action = get_value(action, Location),
+    Handler = get_value(controller, Location, get_value(handler, Env)),
+    giallo_middleware:execute_handler(Handler, Action, Variables, Req, Env).
+
+redirect_or_move(Status, Location, Headers, Req0) ->
+    {ok, Req1} =
+        cowboy_req:reply(Status, [{<<"location">>, Location}], Headers, Req0),
+    {halt, Req1}.
+
 render_template(Req0, Handler, Variables, Headers, Env) ->
     F = fun() ->
             {PathInfo, _Req1} = cowboy_req:path_info(Req0),
             Action = get_function_name(PathInfo),
             Prefix = atom_to_list(Handler),
-            Template = list_to_atom(Prefix ++ "_" ++ Action ++ "_dtl"),
+            Template = list_to_existing_atom(Prefix ++ "_" ++ Action ++ "_dtl"),
             {ok, Response} = apply(Template, render, [Variables]),
             {output, Response, Headers}
     end,
