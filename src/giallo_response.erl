@@ -35,6 +35,12 @@
 
 %% API ------------------------------------------------------------------------
 
+eval({Action, X, Req1}, _Req0, Env) when is_tuple(Req1) ->
+    eval({Action, X}, Req1, Env);
+eval({Action, X, Y, Req1}, _Req0, Env) when is_tuple(Req1) ->
+    eval({Action, X, Y}, Req1, Env);
+eval({Action, X, Y, Z, Req1}, _Req0, Env) when is_tuple(Req1) ->
+    eval({Action, X, Y, Z}, Req1, Env);
 eval(ok, Req0, Env) ->
     eval({ok, []}, Req0, Env);
 eval({ok, Variables}, Req0, Env) ->

@@ -40,6 +40,7 @@
 -export([redirect/4]).
 -export([render_other/4]).
 -export([render_other_landing/4]).
+-export([extra_req_return/4]).
 -export([not_found/4]).
 -export([error_500/4]).
 -export([hello_world_template/4]).
@@ -94,3 +95,7 @@ hello_world_template(<<"GET">>, _Pathinfo, _Extra, _Req) ->
 
 hello_world_template_var(<<"GET">>, _Pathinfo, _Extra, _Req) ->
     {ok, [{payload, <<"Hello World!">>}]}.
+
+extra_req_return(<<"GET">>, [], _Extra, Req0) ->
+    Req1 = cowboy_req:set_resp_header(<<"extra-pextra">>, <<"C.R.E.A.M">>, Req0),
+    {output, <<"Hello World!">>, [], Req1}.

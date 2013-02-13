@@ -48,6 +48,7 @@
 -export([hello_world_template/1]).
 -export([hello_world_template_var/1]).
 -export([redirect_non_existent_action/1]).
+-export([extra_req_return/1]).
 -export([not_found/1]).
 -export([error_500/1]).
 -export([render_other/1]).
@@ -71,6 +72,7 @@ groups() ->
             hello_world,
             hello_world_template,
             hello_world_template_var,
+            extra_req_return,
             not_found,
             render_other,
             redirect_non_existent_action,
@@ -147,6 +149,14 @@ hi_world(Config) ->
     {"HTTP/1.1", 200, "OK"} = Status,
     "Ohai!" = Body,
     {"content-type", "text/html"} = lists:keyfind("content-type", 1, Headers).
+
+extra_req_return(Config) ->
+    Url = base_url(Config),
+    {ok, {Status, Headers, Body}} = httpc:request(Url ++ "extra_req_return"),
+    {"HTTP/1.1", 200, "OK"} = Status,
+    "Hello World!" = Body,
+    {"extra-pextra", "C.R.E.A.M"} =
+                                    lists:keyfind("extra-pextra", 1, Headers).
 
 hi_json(Config) ->
     Url = base_url(Config),
