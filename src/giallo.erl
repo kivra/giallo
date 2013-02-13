@@ -29,6 +29,10 @@
 -export([start/1]).
 -export([start/2]).
 -export([stop/0]).
+-export([post_param/2]).
+-export([post_param/3]).
+-export([query_param/2]).
+-export([query_param/3]).
 
 %% API ------------------------------------------------------------------------
 
@@ -47,6 +51,42 @@ start(Dispatch, Env) ->
 
 stop() ->
     application:stop(giallo).
+
+%% @equiv post_param(Key, Req0, undefined)
+-spec post_param(Key, Req0) -> binary() | undefined when
+    Key     :: binary(),
+    Req0    :: cowboy_req:req().
+post_param(Key, Req0) ->
+    post_param(Key, Req0, undefined).
+
+-spec post_param(Key, Req0, Default) -> binary() | Default when
+    Key     :: binary(),
+    Req0    :: cowboy_req:req(),
+    Default :: any().
+post_param(Key, Req0, Default) ->
+    case cowboy_req:body_qs(Req0) of
+        {error, _Reason} = E -> E;
+        {ok, ValueList}      ->
+            case lists:keyfind(Key, 1, ValueList) of
+                {Key, Value} -> Value;
+                false -> Default
+            end
+    end.
+
+%% @equiv query_param(Key, Req0, undefined)
+-spec query_param(Key, Req0) -> binary() | undefined when
+    Key     :: binary(),
+    Req0    :: cowboy_req:req().
+query_param(Key, Req0) ->
+    query_param(Key, Req0, undefined).
+
+-spec query_param(Key, Req0, Default) -> binary() | Default when
+    Key     :: binary(),
+    Req0    :: cowboy_req:req(),
+    Default :: any().
+query_param(Key, Req0, Default) ->
+    {Value, _Req1} = cowboy_req:qs_val(Key, Req0, Default),
+    Value.
 
 %% Private --------------------------------------------------------------------
 
