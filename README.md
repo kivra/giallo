@@ -53,6 +53,10 @@ list such as `/hi/extra/path/information` would give a list like
 `[<<"extra">>, <<"path">>, <<"information">>]`. The exact match, i.e.
 `/hi` would result in an empty list, `[]`.
 
+The third argument contains any extra variables that either get passed
+from the cowboy dispatcher or via an other action redispatching using
+`render_other`.
+
 The `Req` argument is the standard Cowboy [Request]
 (https://github.com/extend/cowboy/blob/master/src/cowboy_req.erl#L128) Object.
 It's an opaque record so take a look at the functions in
@@ -99,6 +103,39 @@ This would output "Ohai!" for the same URI's as the previous example but
 for anything else it would use the standard Cowboy `handle/2` function.
 So any Giallo function takes precedence over Cowboy handlers.
 
+Session Management
+------------------
+
+If you need Session Management you'll have to include the [Giallo
+Session Backend](https://github.com/kivra/giallo_session).
+
+_before function
+----------------
+
+There's a special function which can be implemented called before_/2
+which can be used to preprocess any request before dispatching to any
+action. This is especially useful when implementing an authentication
+scheme.
+
+The function header looks like:
+
+```erlang
+before_(_Action, _Req) ->
+    {ok, []}.
+
+```
+
+The first parameter is the Action that is to be performed after
+`before_` has been complete. The second parameter is the standard Req
+object.
+
+Possible return values are:
+
+* {ok, Extra}: Extra will get passed as the third argument to the action
+  and as a variable called `before_` to the templates
+* {redirect, Location}: Redirect to the `Location` effectively bypassing
+  the Action
+
 Return values
 -------------
 
@@ -109,16 +146,17 @@ Here's a list of possible return values from a Giallo controller:
   the template
 * {ok, Variables::proplist(), Headers::proplist()}: Same as above but
   also set additional HTTP Headers
-* {redirect, Location::binary()}: Send a 302 redirect to the `Location`
+* {redirect, Location::binary() | proplist()}: Send a 302 redirect to the `Location`
 * {redirect, Location, Headers::proplist()}: Same as above but also set
   additional HTTP Headers
-* {moved, Location::binary()}: Send a 301 redirect to the `Location`
-* {moved, Location::binary(), Headers::proplist()}: Same as above but also set
+* {moved, Location::binary() | proplist()}: Send a 301 redirect to the `Location`
+* {moved, Location::binary() | proplist(), Headers::proplist()}: Same as above but also set
   additional HTTP Headers
-* {render_other, OtherLocation::proplist()}: Render the action and/or
-  view from `OtherLocation`. Possible values for `OtherLocation` are
-`[{action, your_action}, {controller, your_handler}]`
-* {render_other, OtherLocation::proplist(), Variables::proplist()}: Same
+* {render_other, OtherLocationbinary() | ::proplist()}: Render the action and/or
+  view from `Location`. Possible values for `Location` are
+`[{action, your_action}, {controller, your_handler}]` or a binary
+absolute Url
+* {render_other, Location::binary() | ::proplist(), Variables::proplist()}: Same
   as above but pass `Variables` that can be retrieved from the `Extra`
   argument
 * {output, Output::binary()}: print out the `Output`
