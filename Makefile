@@ -1,6 +1,6 @@
 PROJECT = giallo
 DIALYZER = dialyzer
-REBAR = ../kivra_core/rebar
+REBAR = rebar
 
 .PHONY: all deps compile clean test ct build-plt dialyze
 

@@ -38,6 +38,8 @@
 -export([hi/4]).
 -export([moved/4]).
 -export([redirect/4]).
+-export([query_param/4]).
+-export([post_param/4]).
 -export([render_other/4]).
 -export([render_other_landing/4]).
 -export([extra_req_return/4]).
@@ -83,6 +85,16 @@ render_other(<<"GET">>, _Pathinfo, _Extra, _Req) ->
 
 render_other_landing(<<"GET">>, [], _Extra, _Req) ->
     {output, <<"You got rendered!">>}.
+
+query_param(<<"GET">>, [], _Extra, Req) ->
+    <<"b">> = giallo:query_param(<<"a">>, Req),
+    <<"d">> = giallo:query_param(<<"c">>, Req),
+    {output, <<"Ok!">>}.
+
+post_param(<<"POST">>, [], _Extra, Req) ->
+    <<"b">> = giallo:post_param(<<"a">>, Req),
+    <<"d">> = giallo:post_param(<<"c">>, Req),
+    {output, <<"Ok!">>}.
 
 not_found(<<"GET">>, _Pathinfo, _Extra, _Req) ->
     not_found.

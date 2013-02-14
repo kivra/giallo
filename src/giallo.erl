@@ -53,20 +53,20 @@ stop() ->
     application:stop(giallo).
 
 %% @equiv post_param(Key, Req0, undefined)
--spec post_param(Key, Req0) -> binary() | undefined when
+-spec post_param(Key, Req0) -> binary() | undefined | true when
     Key     :: binary(),
     Req0    :: cowboy_req:req().
 post_param(Key, Req0) ->
     post_param(Key, Req0, undefined).
 
--spec post_param(Key, Req0, Default) -> binary() | Default when
+-spec post_param(Key, Req0, Default) -> binary() | Default | true when
     Key     :: binary(),
     Req0    :: cowboy_req:req(),
     Default :: any().
 post_param(Key, Req0, Default) ->
     case cowboy_req:body_qs(Req0) of
         {error, _Reason} = E -> E;
-        {ok, ValueList}      ->
+        {ok, ValueList, _Req1}      ->
             case lists:keyfind(Key, 1, ValueList) of
                 {Key, Value} -> Value;
                 false -> Default
@@ -74,13 +74,13 @@ post_param(Key, Req0, Default) ->
     end.
 
 %% @equiv query_param(Key, Req0, undefined)
--spec query_param(Key, Req0) -> binary() | undefined when
+-spec query_param(Key, Req0) -> binary() | undefined | true when
     Key     :: binary(),
     Req0    :: cowboy_req:req().
 query_param(Key, Req0) ->
     query_param(Key, Req0, undefined).
 
--spec query_param(Key, Req0, Default) -> binary() | Default when
+-spec query_param(Key, Req0, Default) -> binary() | Default | true when
     Key     :: binary(),
     Req0    :: cowboy_req:req(),
     Default :: any().

@@ -40,6 +40,8 @@
 -export([minimal/1]).
 -export([moved/1]).
 -export([redirect/1]).
+-export([query_param/1]).
+-export([post_param/1]).
 -export([hi_world/1]).
 -export([hi_json/1]).
 -export([hi_jsonp/1]).
@@ -75,6 +77,8 @@ groups() ->
             extra_req_return,
             not_found,
             render_other,
+            post_param,
+            query_param,
             redirect_non_existent_action,
             error_500
     ],
@@ -148,6 +152,23 @@ hi_world(Config) ->
     {ok, {Status, Headers, Body}} = httpc:request(Url ++ "hi/you"),
     {"HTTP/1.1", 200, "OK"} = Status,
     "Ohai!" = Body,
+    {"content-type", "text/html"} = lists:keyfind("content-type", 1, Headers).
+
+query_param(Config) ->
+    Url = base_url(Config),
+    {ok, {Status, Headers, Body}} = httpc:request(Url ++ "query_param?a=b&c=d"),
+    {"HTTP/1.1", 200, "OK"} = Status,
+    "Ok!" = Body,
+    {"content-type", "text/html"} = lists:keyfind("content-type", 1, Headers).
+
+post_param(Config) ->
+    Url = base_url(Config),
+    {ok, {Status, Headers, Body}} = httpc:request(post,
+                            {Url ++ "post_param", [],
+                             "application/x-www-form-urlencoded",
+                             "a=b&c=d"}, [], []),
+    {"HTTP/1.1", 200, "OK"} = Status,
+    "Ok!" = Body,
     {"content-type", "text/html"} = lists:keyfind("content-type", 1, Headers).
 
 extra_req_return(Config) ->
