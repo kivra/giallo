@@ -103,6 +103,41 @@ This would output "Ohai!" for the same URI's as the previous example but
 for anything else it would use the standard Cowboy `handle/2` function.
 So any Giallo function takes precedence over Cowboy handlers.
 
+Index action
+------------
+
+`index_` is a special action that can be implemented and will handle
+resource listings, i.e. `http://my.server/path/`. Any handler mapped to
+`/path/` will have it's `index_` function executed. `index_` functions
+behave the same as any other function and can thus use templating, etc.
+
+Templating
+----------
+
+Giallo uses [ErlyDTL](https://github.com/evanmiller/erlydtl) for
+standard templating. To dispatch a request from a Giallo controller you
+return `ok`, `{ok, Variables}` or `{ok, Variables, Headers}`. Giallo
+will then render the template associated with that controller and
+action. Giallo compounds the name as `<controller>_<action>`.
+
+Giallo will also try and find a template for a action even though no
+action in the controller exists. To remedy the need to implement
+boilerplate actions that just exist to render a template you can skip
+those altogether and just create the template using the same naming
+scheme.
+
+You control how you compile your ErlyDtl templates through rebar. Using
+the `erlydtl_opts` directive you can specify where to find your
+templates:
+
+```erlang
+{erlydtl_opts, [
+    {doc_root, "templates"}, % Where to find your templates
+    {source_ext, ".html"} % Extension on your uncomplied templates
+]}.
+
+```
+
 Session Management
 ------------------
 

@@ -27,7 +27,8 @@
 -module(giallo_response).
 
 -export([eval/3]).
--export([try_fun/6]).
+
+-include("giallo.hrl").
 
 -define(DEFAULT_CT, [{<<"content-type">>, <<"text/html">>}]).
 -define(JSON_CT, [{<<"content-type">>, <<"application/json">>}]).
@@ -75,10 +76,8 @@ eval({json, Data}, Req0, Env) ->
 eval({json, Data, []}, Req0, Env) ->
     eval({json, Data, ?JSON_CT}, Req0, Env);
 eval({json, Data, Headers}, Req0, Env) ->
-    F = fun() ->
-            {output, jsx:encode(Data), Headers}
-    end,
-    eval(try_fun(F, Req0, jsx, encode, 1, Env), Req0, Env);
+    F = ?lazy({output, jsx:encode(Data), Headers}),
+    eval(?do_or_error(F, Req0, jsx, encode, 1, Env), Req0, Env);
 eval({jsonp, Callback, Data}, Req0, Env) ->
     eval({jsonp, Callback, Data, []}, Req0, Env);
 eval({jsonp, Callback, Data, []}, Req0, Env) ->
@@ -89,7 +88,7 @@ eval({jsonp, Callback, Data, Headers}, Req0, Env) ->
             Payload = <<Callback/binary, "(", JsonData/binary, ");">>,
             {output, Payload, Headers}
     end,
-    eval(try_fun(F, Req0, jsx, encode, 1, Env), Req0, Env);
+    eval(?do_or_error(F, Req0, jsx, encode, 1, Env), Req0, Env);
 eval({output, Output}, Req0, Env) ->
     eval({output, Output, []}, Req0, Env);
 eval({output, Output, []}, Req0, Env) ->
@@ -104,20 +103,6 @@ eval({error, Status}, Req0, _Env) ->
     {error, Status, Req0};
 eval(continue, Req, Env) ->
     {ok, Req, Env}.
-
-try_fun(Fun, Req, Handler, Action, Arity, Env) ->
-    try Fun()
-    catch Class:Reason ->
-            error_logger:error_msg(
-            "** Giallo handler ~p terminating in ~p/~p~n"
-            "   for the reason ~p:~p~n"
-            "** Handler state was ~p~n"
-            "** Request was ~p~n"
-            "** Stacktrace: ~p~n~n",
-            [Handler, Action, Arity, Class, Reason, Env,
-                cowboy_req:to_list(Req), erlang:get_stacktrace()]),
-            {error, 500}
-    end.
 
 %% Private --------------------------------------------------------------------
 
@@ -140,7 +125,7 @@ render_template(Req0, Handler, Variables, Headers, Env) ->
             {ok, Response} = apply(Template, render, [Variables]),
             {output, Response, Headers}
     end,
-    try_fun(F, Req0, erlydtl, render, 1, Env).
+    ?do_or_error(F, Req0, erlydtl, render, 1, Env).
 
 get_function_name(undefined) ->
     "index_";

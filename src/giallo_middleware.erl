@@ -27,6 +27,8 @@
 -module(giallo_middleware).
 -behaviour(cowboy_middleware).
 
+-include("giallo.hrl").
+
 -export([execute/2]).
 -export([execute_handler/5]).
 
@@ -88,8 +90,7 @@ handler_handle(Handler, Action, PathInfo, Arguments, Req0, Env) ->
                                                             PathInfo,
                                                             Parameters, Req1])
                             end,
-                            giallo_response:try_fun(F, Req0, Handler, 4,
-                                                    Action, Env);
+                            ?do_or_error(F, Req0, Handler, 4, Action, Env);
                         false -> ok
                     end
             end;
@@ -99,10 +100,8 @@ handler_handle(Handler, Action, PathInfo, Arguments, Req0, Env) ->
 maybe_do_before(Handler, Action, Req0, Env) ->
     case erlang:function_exported(Handler, before_, 2) of
         true ->
-            F = fun() ->
-                    apply(Handler, before_, [Action, Req0])
-            end,
-            giallo_response:try_fun(F, Req0, Handler, 2, before_, Env);
+            F = ?lazy(apply(Handler, before_, [Action, Req0])),
+            ?do_or_error(F, Req0, Handler, 2, before_, Env);
         false -> {ok, []}
     end.
 
@@ -112,10 +111,8 @@ get_function_name(Handler, []) ->
     ensure_action(Handler, "index_");
 get_function_name(Handler, PathInfo) ->
     Function = binary_to_list(hd(PathInfo)),
-    try list_to_existing_atom(Function)
-    catch _:_ ->
-            ensure_action(Handler, Function)
-    end.
+    ?do_or_else(?lazy(list_to_existing_atom(Function)),
+                ?lazy(ensure_action(Handler, Function))).
 
 ensure_action(Handler, Function) ->
     Prefix = atom_to_list(Handler),
