@@ -128,7 +128,7 @@ get_function_name(Handler, []) ->
 get_function_name(Handler, PathInfo) ->
     Function = binary_to_list(hd(PathInfo)),
     ?do_or_else(?lazy(list_to_existing_atom(Function)),
-                ?lazy(ensure_action(Handler, Function))).
+                fun(_) -> ensure_action(Handler, Function) end).
 
 ensure_action(Handler, Function) ->
     Prefix = atom_to_list(Handler),
