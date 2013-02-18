@@ -106,10 +106,16 @@ So any Giallo function takes precedence over Cowboy handlers.
 Index action
 ------------
 
-`index_` is a special action that can be implemented and will handle
+`index_/4` is a special action that can be implemented and will handle
 resource listings, i.e. `http://my.server/path/`. Any handler mapped to
 `/path/` will have it's `index_` function executed. `index_` functions
 behave the same as any other function and can thus use templating, etc.
+
+```erlang
+index_(<<"GET">>, [], _Extra, _Req) ->
+    {output, <<"Index listing">>}.
+
+```
 
 Templating
 ----------
