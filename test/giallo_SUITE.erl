@@ -45,6 +45,7 @@
 -export([hi_world/1]).
 -export([hi_json/1]).
 -export([hi_jsonp/1]).
+-export([before_template/1]).
 -export([subpath_hi_world/1]).
 -export([hello_world/1]).
 -export([hello_world_template/1]).
@@ -75,6 +76,7 @@ groups() ->
             hello_world_template,
             hello_world_template_var,
             extra_req_return,
+            before_template,
             not_found,
             render_other,
             post_param,
@@ -236,6 +238,14 @@ hello_world_template(Config) ->
                                                    "hello_world_template"),
     {"HTTP/1.1", 200, "OK"} = Status,
     "Hello World!\n" = Body,
+    {"content-type", "text/html"} = lists:keyfind("content-type", 1, Headers).
+
+before_template(Config) ->
+    Url = base_url(Config),
+    {ok, {Status, Headers, Body}} = httpc:request(Url ++
+                                                   "before_template"),
+    {"HTTP/1.1", 200, "OK"} = Status,
+    "Before!\n" = Body,
     {"content-type", "text/html"} = lists:keyfind("content-type", 1, Headers).
 
 hello_world_template_var(Config) ->

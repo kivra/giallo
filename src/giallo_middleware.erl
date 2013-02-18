@@ -60,10 +60,23 @@ execute(Req0, Env) ->
 execute_handler(Handler, Action, Arguments, Req0, Env) ->
     {PathInfo, Req1} = cowboy_req:path_info(Req0),
     Extra = get_extra(PathInfo),
-    giallo_response:eval(handler_handle(Handler, Action, Extra, Arguments,
-                                         Req1, Env), Req1, Env).
+    giallo_response:eval(unmarshal_before(handler_handle(Handler, Action,
+                                                         Extra, Arguments,
+                                                         Req1, Env)),
+                                          Req1, Env).
 
 %% Private --------------------------------------------------------------------
+
+unmarshal_before({before, [], Eval}) ->
+    Eval;
+unmarshal_before({before, Args, ok}) ->
+    {ok, [{before, Args}]};
+unmarshal_before({before, Args, {ok, Var}}) ->
+    {ok, [{before, Args} | Var]};
+unmarshal_before({before, Args, {ok, Var, Headers}}) ->
+    {ok, [{before, Args} | Var], Headers};
+unmarshal_before(Eval) ->
+    Eval.
 
 get_action(Handler, Req0) ->
     {PathInfo, Req1} = cowboy_req:path_info(Req0),
@@ -86,9 +99,12 @@ handler_handle(Handler, Action, PathInfo, Arguments, Req0, Env) ->
                             F = fun() ->
                                     Parameters = Arguments ++ BeforeArgs,
                                     {Method, Req1} = cowboy_req:method(Req0),
-                                    apply(Handler, Action, [Method,
-                                                            PathInfo,
-                                                            Parameters, Req1])
+                                    {before, BeforeArgs, apply(Handler,
+                                                               Action,
+                                                               [Method,
+                                                                PathInfo,
+                                                                Parameters,
+                                                                Req1])}
                             end,
                             ?do_or_error(F, Req0, Handler, 4, Action, Env);
                         false -> ok

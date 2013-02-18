@@ -38,6 +38,7 @@
 -export([hi/4]).
 -export([moved/4]).
 -export([redirect/4]).
+-export([before_template/4]).
 -export([query_param/4]).
 -export([post_param/4]).
 -export([render_other/4]).
@@ -63,6 +64,8 @@ terminate(_Reason, _Req, _State) ->
 before_(redirect_non_existent_action, _Req) ->
     {redirect, [{action, render_other_landing},
                 {controller, default_handler}]};
+before_(before_template, _Req) ->
+    {ok, [{before_var, <<"Before!">>}]};
 before_(_, _Req) ->
     {ok, []}.
 
@@ -72,6 +75,10 @@ hi(<<"GET">>, [<<"json">>], _Extra, _Req) ->
     {json, [{<<"jason">>, <<"Ohai!">>}]};
 hi(<<"GET">>, [<<"jsonp">>], _Extra, _Req) ->
     {jsonp, <<"callback">>, [{<<"jason">>, <<"Ohai!">>}]}.
+
+before_template(<<"GET">>, [], Extra, _Req) ->
+    <<"Before!">> = proplists:get_value(before_var, Extra),
+    ok.
 
 moved(<<"GET">>, _Pathinfo, _Extra, _Req) ->
     {moved, <<"http://127.0.0.1:8080/hi/you">>}.
