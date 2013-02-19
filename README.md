@@ -18,6 +18,12 @@ Giallo can be easily embedded and provides some conveinient methods for
 working with Controller and Views while giving possibility to use
 standard Cowboy features when necessary.
 
+Examples
+--------
+
+Here's some [examples](https://github.com/kivra/giallo_examples) that will
+show Giallo in action.
+
 Getting Started
 ----
 
