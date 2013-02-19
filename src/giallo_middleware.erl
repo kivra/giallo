@@ -42,11 +42,8 @@
 execute(Req0, Env) ->
     {handler, Handler} = lists:keyfind(handler, 1, Env),
     {handler_opts, Arguments} = lists:keyfind(handler_opts, 1, Env),
-    case get_action(Handler, Req0) of
-        continue       -> {ok, Req0, Env};
-        {Req1, Action} ->
-           execute_handler(Handler, Action, Arguments, Req1, Env)
-    end.
+    {Req1, Action} = get_action(Handler, Req0),
+    execute_handler(Handler, Action, Arguments, Req1, Env).
 
 
 -spec execute_handler(Handler, Action, Arguments, Req0, Env) ->
@@ -57,15 +54,58 @@ execute(Req0, Env) ->
     ,Req0      :: cowboy_req:req()
     ,Req       :: cowboy_req:req()
     ,Env       :: cowboy_middleware:env().
-execute_handler(Handler, Action, Arguments, Req0, Env) ->
+execute_handler(Handler, ActionName, Arguments, Req0, Env) ->
     {PathInfo, Req1} = cowboy_req:path_info(Req0),
     Extra = get_extra(PathInfo),
+    Action = do_get_action(Handler, [ActionName]),
     giallo_response:eval(unmarshal_before(handler_handle(Handler, Action,
                                                          Extra, Arguments,
                                                          Req1, Env)),
-                                          Req1, Env).
+                         Req1, Env).
 
 %% Private --------------------------------------------------------------------
+
+handler_handle(_Handler, undefined, _PathInfo, _Arguments, _Req0, _Env) ->
+    continue;
+handler_handle(Handler, Action, PathInfo, Arguments, Req0, Env) ->
+    case maybe_do_before(Handler, Action, Req0, Env) of
+        {redirect, _Location} = Redirect ->
+            Redirect;
+        {error, 500} = Error ->
+            Error;
+        {ok, BeforeArgs} ->
+            F = fun() ->
+                    Parameters = Arguments ++ BeforeArgs,
+                    {Method, Req1} = cowboy_req:method(Req0),
+                    {before, BeforeArgs, apply(Handler,
+                                               Action,
+                                               [Method,
+                                                PathInfo,
+                                                Parameters,
+                                                Req1])}
+            end,
+            ?exported_or_else({Handler, Action, 4},
+                              ?lazy(?do_or_error(F, Req0, Handler, Action,
+                                                 4, Env)),
+                              ?lazy(continue))
+    end.
+
+get_action(Handler, Req0) ->
+    {PathInfo, Req1} = cowboy_req:path_info(Req0),
+    {Req1, do_get_action(Handler, PathInfo)}.
+
+do_get_action(Handler, undefined) ->
+    do_get_action(Handler, [<<"index_">>]);
+do_get_action(Handler, []) ->
+    do_get_action(Handler, [<<"index_">>]);
+do_get_action(Handler, [ActionName | _]) ->
+    F = fun() ->
+            case code:ensure_loaded(Handler) of
+                {module, Handler}  -> ?any_to_existing_atom(ActionName);
+                {error, _Reason}   -> undefined
+            end
+    end,
+    ?do_or_else(F, fun(_) -> undefined end).
 
 unmarshal_before({before, [], Eval}) ->
     Eval;
@@ -78,66 +118,11 @@ unmarshal_before({before, Args, {ok, Var, Headers}}) ->
 unmarshal_before(Eval) ->
     Eval.
 
-get_action(Handler, Req0) ->
-    {PathInfo, Req1} = cowboy_req:path_info(Req0),
-    case get_function_name(Handler, PathInfo) of
-        undefined -> continue;
-        Action    -> {Req1, Action}
-    end.
-
-handler_handle(Handler, Action, PathInfo, Arguments, Req0, Env) ->
-    case code:ensure_loaded(Handler) of
-        {module, Handler} ->
-            case maybe_do_before(Handler, Action, Req0, Env) of
-                {redirect, _Location} = Redirect ->
-                    Redirect;
-                {error, 500} = Error ->
-                    Error;
-                {ok, BeforeArgs} ->
-                    case erlang:function_exported(Handler, Action, 4) of
-                        true ->
-                            F = fun() ->
-                                    Parameters = Arguments ++ BeforeArgs,
-                                    {Method, Req1} = cowboy_req:method(Req0),
-                                    {before, BeforeArgs, apply(Handler,
-                                                               Action,
-                                                               [Method,
-                                                                PathInfo,
-                                                                Parameters,
-                                                                Req1])}
-                            end,
-                            ?do_or_error(F, Req0, Handler, 4, Action, Env);
-                        false -> ok
-                    end
-            end;
-        {error, _Reason} -> continue
-    end.
-
 maybe_do_before(Handler, Action, Req0, Env) ->
-    case erlang:function_exported(Handler, before_, 2) of
-        true ->
-            F = ?lazy(apply(Handler, before_, [Action, Req0])),
-            ?do_or_error(F, Req0, Handler, 2, before_, Env);
-        false -> {ok, []}
-    end.
-
-get_function_name(_Handler, undefined) ->
-    index_;
-get_function_name(Handler, []) ->
-    ensure_action(Handler, "index_");
-get_function_name(Handler, PathInfo) ->
-    Function = binary_to_list(hd(PathInfo)),
-    ?do_or_else(?lazy(list_to_existing_atom(Function)),
-                fun(_) -> ensure_action(Handler, Function) end).
-
-ensure_action(Handler, Function) ->
-    Prefix = atom_to_list(Handler),
-    %% TODO: Possible atom leakage
-    Template = list_to_atom(Prefix ++ "_" ++ Function ++ "_dtl"),
-    case code:ensure_loaded(Template) of
-        {module, Template} -> list_to_existing_atom(Function);
-        {error, _Reason}   -> undefined
-    end.
+    F = ?lazy(apply(Handler, before_, [Action, Req0])),
+    ?exported_or_else({Handler, before_, 2},
+                      ?lazy(?do_or_error(F, Req0, Handler, before_, 2, Env)),
+                      ?lazy({ok, []})).
 
 get_extra([]) ->
     [];

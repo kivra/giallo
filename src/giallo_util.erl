@@ -28,6 +28,8 @@
 
 -export([do_or_else/2]).
 -export([do_or_error/6]).
+-export([exported_or_else/3]).
+-export([any_to_existing_atom/1]).
 
 %% API ------------------------------------------------------------------------
 
@@ -37,16 +39,30 @@ do_or_else(F, E) ->
 			E({exception, Class, Reason, erlang:get_stacktrace()})
 	end.
 
-do_or_error(Fun, Req, Handler, Action, Arity, Env) ->
-    try Fun()
-    catch Class:Reason ->
-            error_logger:error_msg(
-            "** Giallo handler ~p terminating in ~p/~p~n"
-            "   for the reason ~p:~p~n"
-            "** Handler state was ~p~n"
-            "** Request was ~p~n"
-            "** Stacktrace: ~p~n~n",
-            [Handler, Action, Arity, Class, Reason, Env,
-                cowboy_req:to_list(Req), erlang:get_stacktrace()]),
-            {error, 500}
-    end.
+do_or_error(F, Req, Handler, Action, Arity, Env) ->
+	E = fun({exception, Class, Reason, Stacktrace}) ->
+			error_logger:error_msg(
+				"** Giallo handler ~p terminating in ~p/~p~n"
+				"   for the reason ~p:~p~n"
+				"** Handler state was ~p~n"
+				"** Request was ~p~n"
+				"** Stacktrace: ~p~n~n",
+				[Handler, Action, Arity, Class, Reason, Env,
+					cowboy_req:to_list(Req), Stacktrace]),
+			{error, 500}
+	end,
+	do_or_else(F, E).
+
+exported_or_else({Handler, Action, Arity}, F, E) ->
+	case erlang:function_exported(Handler, Action, Arity) of
+		true  -> F();
+		false -> E()
+	end.
+
+any_to_existing_atom(A) when is_atom(A) ->
+	A;
+any_to_existing_atom(L) when is_list(L) ->
+	any_to_existing_atom(list_to_existing_atom(L));
+any_to_existing_atom(B) when is_binary(B) ->
+	any_to_existing_atom(binary_to_list(B)).
+

@@ -42,7 +42,7 @@ This would map the `my_handler` using standard Cowboy
 URI `http://yourserver/`. Implementing the action `hi` would make
 Giallo output "Ohai!" when performing a GET on `/hi` or anything
 below `/hi/extra...`., while outputting `OhNo!` when performing a GET on
-anything else. Any action that is implemented explicitly, such as `hi/3`
+anything else. Any action that is implemented explicitly, such as `hi/4`
 gets precedence over the standard Cowboy Handler.
 
 
@@ -55,7 +55,7 @@ list such as `/hi/extra/path/information` would give a list like
 
 The third argument contains any extra variables that either get passed
 from the cowboy dispatcher or via an other action redispatching using
-`render_other`.
+`render_other` or from the before_/4 function.
 
 The `Req` argument is the standard Cowboy [Request]
 (https://github.com/extend/cowboy/blob/master/src/cowboy_req.erl#L128) Object.
@@ -125,12 +125,6 @@ standard templating. To dispatch a request from a Giallo controller you
 return `ok`, `{ok, Variables}` or `{ok, Variables, Headers}`. Giallo
 will then render the template associated with that controller and
 action. Giallo compounds the name as `<controller>_<action>`.
-
-Giallo will also try and find a template for a action even though no
-action in the controller exists. To remedy the need to implement
-boilerplate actions that just exist to render a template you can skip
-those altogether and just create the template using the same naming
-scheme.
 
 You control how you compile your ErlyDtl templates through rebar. Using
 the `erlydtl_opts` directive you can specify where to find your

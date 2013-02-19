@@ -122,8 +122,13 @@ render_template(Req0, Handler, Variables, Headers, Env) ->
             Action = get_function_name(PathInfo),
             Prefix = atom_to_list(Handler),
             Template = list_to_existing_atom(Prefix ++ "_" ++ Action ++ "_dtl"),
-            {ok, Response} = apply(Template, render, [Variables]),
-            {output, Response, Headers}
+            case code:ensure_loaded(Template) of
+                {module, Template} ->
+                    {ok, Response} = apply(Template, render, [Variables]),
+                    {output, Response, Headers};
+                {error, _Reason} ->
+                    continue
+            end
     end,
     ?do_or_error(F, Req0, erlydtl, render, 1, Env).
 
