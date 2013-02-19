@@ -150,7 +150,7 @@ Session Management
 If you need Session Management you'll have to include the [Giallo
 Session Backend](https://github.com/kivra/giallo_session).
 
-_before function
+before_ function
 ----------------
 
 There's a special function which can be implemented called before_/2
