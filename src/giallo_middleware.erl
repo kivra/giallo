@@ -61,7 +61,7 @@ execute_handler(Handler, ActionName, Arguments, Req0, Env) ->
     giallo_response:eval(unmarshal_before(handler_handle(Handler, Action,
                                                          Extra, Arguments,
                                                          Req1, Env)),
-                         Req1, Env).
+                         Req1, Env, Handler, Action).
 
 %% Private --------------------------------------------------------------------
 

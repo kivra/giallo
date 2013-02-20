@@ -26,9 +26,13 @@
 
 -module(giallo_response).
 
--export([eval/3]).
+-export([eval/5]).
 
 -include("giallo.hrl").
+
+-type eval_action() :: ok | redirect | moved | render_other | stream | json |
+                       jsonp | output | not_found | error.
+-type eval() :: ok | continue | {eval_action(), any(), any(), any()}.
 
 -define(DEFAULT_CT, [{<<"content-type">>, <<"text/html">>}]).
 -define(JSON_CT, [{<<"content-type">>, <<"application/json">>}]).
@@ -36,79 +40,91 @@
 
 %% API ------------------------------------------------------------------------
 
-eval({Action, X, Req1}, _Req0, Env) when is_tuple(Req1) ->
-    eval({Action, X}, Req1, Env);
-eval({Action, X, Y, Req1}, _Req0, Env) when is_tuple(Req1) ->
-    eval({Action, X, Y}, Req1, Env);
-eval({Action, X, Y, Z, Req1}, _Req0, Env) when is_tuple(Req1) ->
-    eval({Action, X, Y, Z}, Req1, Env);
-eval(ok, Req0, Env) ->
-    eval({ok, []}, Req0, Env);
-eval({ok, Variables}, Req0, Env) ->
-    eval({ok, Variables, []}, Req0, Env);
-eval({ok, Variables, Headers}, Req0, Env) ->
-    Response = render_template(Req0, get_value(handler, Env),
+-spec eval(Eval, Req0, Env, Handler, Action) ->
+    {halt, Req1} | {error, Status, Req1} | {ok, Req1, Env} when
+    Eval    :: eval(),
+    Req0    :: cowboy_req:req(),
+    Env     :: cowboy_middleware:env(),
+    Handler :: module(),
+    Action  :: atom(),
+    Status  :: non_neg_integer().
+eval({EvalAction, X, Req1}, _, Env, Handler, Action) when is_tuple(Req1) ->
+    eval({EvalAction, X}, Req1, Env, Handler, Action);
+eval({EvalAction, X, Y, Req1}, _, Env, Handler, Action) when is_tuple(Req1) ->
+    eval({EvalAction, X, Y}, Req1, Env, Handler, Action);
+eval({EvalAction, X, Y, Z, Req1}, _, Env, Handler, Action)
+                                                        when is_tuple(Req1) ->
+    eval({EvalAction, X, Y, Z}, Req1, Env, Handler, Action);
+eval(ok, Req0, Env, Handler, Action) ->
+    eval({ok, []}, Req0, Env, Handler, Action);
+eval({ok, Variables}, Req0, Env, Handler, Action) ->
+    eval({ok, Variables, []}, Req0, Env, Handler, Action);
+eval({ok, Variables, Headers}, Req0, Env, Handler, Action) ->
+    Response = render_template(Req0, Handler, Action,
                                Variables, Headers, Env),
-    eval(Response, Req0, Env);
-eval({redirect, Location}, Req0, Env) when is_binary(Location) ->
-    eval({redirect, Location, []}, Req0, Env);
-eval({redirect, Location}, Req0, Env) ->
-    render_other(Location, [], Req0, Env);
-eval({redirect, Location, Headers}, Req0, _Env) ->
+    eval(Response, Req0, Env, Handler, Action);
+eval({redirect, Location}, Req0, Env, Handler, Action)
+                                                when is_binary(Location) ->
+    eval({redirect, Location, []}, Req0, Env, Handler, Action);
+eval({redirect, Location}, Req0, Env, Handler, _) ->
+    render_other(Location, Handler, [], Req0, Env);
+eval({redirect, Location, Headers}, Req0, _, _, _) ->
     redirect_or_move(302, Location, Headers, Req0);
-eval({moved, Location}, Req0, Env) ->
-    eval({moved, Location, []}, Req0, Env);
-eval({moved, Location, Headers}, Req0, _Env) ->
+eval({moved, Location}, Req0, Env, Handler, Action) ->
+    eval({moved, Location, []}, Req0, Env, Handler, Action);
+eval({moved, Location, Headers}, Req0, _, _, _) ->
     redirect_or_move(301, Location, Headers, Req0);
-eval({render_other, Location}, Req0, _Env) when is_binary(Location) ->
+eval({render_other, Location}, Req0, _, _, _) when is_binary(Location) ->
     redirect_or_move(302, Location, [], Req0);
-eval({render_other, Location}, Req0, Env) ->
-    eval({render_other, Location, []}, Req0, Env);
-eval({render_other, Location, Variables}, Req0, Env) ->
-    render_other(Location, Variables, Req0, Env);
-eval({stream, Fun, Acc0}, Req0, Env) ->
-    eval({stream, Fun, Acc0, []}, Req0, Env);
-eval({stream, _Fun, _Acc0, _Headers}, _Req0, _Env) ->
+eval({render_other, Location}, Req0, Env, Handler, Action) ->
+    eval({render_other, Location, []}, Req0, Env, Handler, Action);
+eval({render_other, Location, Variables}, Req0, Env, Handler, _) ->
+    render_other(Location, Handler, Variables, Req0, Env);
+eval({stream, Fun, Acc0}, Req0, Env, Handler, Action) ->
+    eval({stream, Fun, Acc0, []}, Req0, Env, Handler, Action);
+eval({stream, _Fun, _Acc0, _Headers}, _Req0, _En, _, _v) ->
     % TODO: Implement
     implement;
-eval({json, Data}, Req0, Env) ->
-    eval({json, Data, []}, Req0, Env);
-eval({json, Data, []}, Req0, Env) ->
-    eval({json, Data, ?JSON_CT}, Req0, Env);
-eval({json, Data, Headers}, Req0, Env) ->
+eval({json, Data}, Req0, Env, Handler, Action) ->
+    eval({json, Data, []}, Req0, Env, Handler, Action);
+eval({json, Data, []}, Req0, Env, Handler, Action) ->
+    eval({json, Data, ?JSON_CT}, Req0, Env, Handler, Action);
+eval({json, Data, Headers}, Req0, Env, Handler, Action) ->
     F = ?lazy({output, jsx:encode(Data), Headers}),
-    eval(?do_or_error(F, Req0, jsx, encode, 1, Env), Req0, Env);
-eval({jsonp, Callback, Data}, Req0, Env) ->
-    eval({jsonp, Callback, Data, []}, Req0, Env);
-eval({jsonp, Callback, Data, []}, Req0, Env) ->
-    eval({jsonp, Callback, Data, ?JS_CT}, Req0, Env);
-eval({jsonp, Callback, Data, Headers}, Req0, Env) ->
+    eval(?do_or_error(F, Req0, jsx, encode, 1, Env),
+         Req0, Env, Handler, Action);
+eval({jsonp, Callback, Data}, Req0, Env, Handler, Action) ->
+    eval({jsonp, Callback, Data, []}, Req0, Env, Handler, Action);
+eval({jsonp, Callback, Data, []}, Req0, Env, Handler, Action) ->
+    eval({jsonp, Callback, Data, ?JS_CT}, Req0, Env, Handler, Action);
+eval({jsonp, Callback, Data, Headers}, Req0, Env, Handler, Action) ->
     F = fun() ->
             JsonData = jsx:encode(Data),
             Payload = <<Callback/binary, "(", JsonData/binary, ");">>,
             {output, Payload, Headers}
     end,
-    eval(?do_or_error(F, Req0, jsx, encode, 1, Env), Req0, Env);
-eval({output, Output}, Req0, Env) ->
-    eval({output, Output, []}, Req0, Env);
-eval({output, Output, []}, Req0, Env) ->
-    eval({output, Output, ?DEFAULT_CT}, Req0, Env);
-eval({output, Output, Headers}, Req0, _Env) ->
+    eval(?do_or_error(F, Req0, jsx, encode, 1, Env),
+         Req0, Env, Handler, Action);
+eval({output, Output}, Req0, Env, Handler, Action) ->
+    eval({output, Output, []}, Req0, Env, Handler, Action);
+eval({output, Output, []}, Req0, Env, Handler, Action) ->
+    eval({output, Output, ?DEFAULT_CT}, Req0, Env, Handler, Action);
+eval({output, Output, Headers}, Req0, _, _, _) ->
     {ok, Req1} = cowboy_req:reply(200, Headers, Output, Req0),
     {halt, Req1};
-eval(not_found, Req0, _Env) ->
+eval(not_found, Req0, _, _, _) ->
     {ok, Req1} = cowboy_req:reply(404, Req0),
     {halt, Req1};
-eval({error, Status}, Req0, _Env) ->
+eval({error, Status}, Req0, _, _, _) ->
     {error, Status, Req0};
-eval(continue, Req, Env) ->
+eval(continue, Req, Env, _, _) ->
     {ok, Req, Env}.
 
 %% Private --------------------------------------------------------------------
 
-render_other(Location, Variables, Req, Env) ->
+render_other(Location, DefaultHandler, Variables, Req, Env) ->
     Action = get_value(action, Location),
-    Handler = get_value(controller, Location, get_value(handler, Env)),
+    Handler = get_value(controller, Location, DefaultHandler),
     giallo_middleware:execute_handler(Handler, Action, Variables, Req, Env).
 
 redirect_or_move(Status, Location, Headers, Req0) ->
@@ -116,12 +132,11 @@ redirect_or_move(Status, Location, Headers, Req0) ->
         cowboy_req:reply(Status, [{<<"location">>, Location}], Headers, Req0),
     {halt, Req1}.
 
-render_template(Req0, Handler, Variables, Headers, Env) ->
+render_template(Req0, Handler, Action0, Variables, Headers, Env) ->
     F = fun() ->
-            {PathInfo, _Req1} = cowboy_req:path_info(Req0),
-            Action = get_function_name(PathInfo),
+            Action1 = atom_to_list(Action0),
             Prefix = atom_to_list(Handler),
-            Template = list_to_existing_atom(Prefix ++ "_" ++ Action ++ "_dtl"),
+            Template = list_to_existing_atom(Prefix++"_"++Action1++"_dtl"),
             case code:ensure_loaded(Template) of
                 {module, Template} ->
                     {ok, Response} = apply(Template, render, [Variables]),
@@ -131,13 +146,6 @@ render_template(Req0, Handler, Variables, Headers, Env) ->
             end
     end,
     ?do_or_error(F, Req0, erlydtl, render, 1, Env).
-
-get_function_name(undefined) ->
-    "index_";
-get_function_name([]) ->
-    "index_";
-get_function_name(PathInfo) ->
-    binary_to_list(hd(PathInfo)).
 
 get_value(Key, List) ->
     get_value(Key, List, undefined).
