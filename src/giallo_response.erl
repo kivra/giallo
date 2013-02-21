@@ -32,7 +32,9 @@
 
 -type eval_action() :: ok | redirect | moved | render_other | stream | json |
                        jsonp | output | not_found | error.
--type eval() :: ok | continue | {eval_action(), any(), any(), any()}.
+-type eval() :: ok | continue | {eval_action(), any(), any(), any()} |
+                {eval_action(), any()} | {eval_action(), any(), any()} |
+                {eval_action(), any(), any(), any()}.
 
 -define(DEFAULT_CT, [{<<"content-type">>, <<"text/html">>}]).
 -define(JSON_CT, [{<<"content-type">>, <<"application/json">>}]).
@@ -44,6 +46,7 @@
     {halt, Req1} | {error, Status, Req1} | {ok, Req1, Env} when
     Eval    :: eval(),
     Req0    :: cowboy_req:req(),
+    Req1    :: cowboy_req:req(),
     Env     :: cowboy_middleware:env(),
     Handler :: module(),
     Action  :: atom(),
@@ -66,20 +69,20 @@ eval({ok, Variables, Headers}, Req0, Env, Handler, Action) ->
 eval({redirect, Location}, Req0, Env, Handler, Action)
                                                 when is_binary(Location) ->
     eval({redirect, Location, []}, Req0, Env, Handler, Action);
-eval({redirect, Location}, Req0, Env, Handler, _) ->
-    render_other(Location, Handler, [], Req0, Env);
+eval({redirect, Location}, Req0, Env, Handler, Action) ->
+    eval(redirect_other(Location, Handler, [], Req0, Env),
+         Req0, Env, Handler, Action);
 eval({redirect, Location, Headers}, Req0, _, _, _) ->
     redirect_or_move(302, Location, Headers, Req0);
 eval({moved, Location}, Req0, Env, Handler, Action) ->
     eval({moved, Location, []}, Req0, Env, Handler, Action);
 eval({moved, Location, Headers}, Req0, _, _, _) ->
     redirect_or_move(301, Location, Headers, Req0);
-eval({render_other, Location}, Req0, _, _, _) when is_binary(Location) ->
-    redirect_or_move(302, Location, [], Req0);
 eval({render_other, Location}, Req0, Env, Handler, Action) ->
     eval({render_other, Location, []}, Req0, Env, Handler, Action);
-eval({render_other, Location, Variables}, Req0, Env, Handler, _) ->
-    render_other(Location, Handler, Variables, Req0, Env);
+eval({render_other, Location, Variables}, Req0, Env, Handler, Action) ->
+    eval(render_other(Location, Handler, Variables, Req0, Env),
+         Req0, Env, Handler, Action);
 eval({stream, Fun, Acc0}, Req0, Env, Handler, Action) ->
     eval({stream, Fun, Acc0, []}, Req0, Env, Handler, Action);
 eval({stream, _Fun, _Acc0, _Headers}, _Req0, _En, _, _v) ->
@@ -122,10 +125,15 @@ eval(continue, Req, Env, _, _) ->
 
 %% Private --------------------------------------------------------------------
 
-render_other(Location, DefaultHandler, Variables, Req, Env) ->
+redirect_other(Location, DefaultHandler, Variables, Req, Env) ->
     Action = get_value(action, Location),
     Handler = get_value(controller, Location, DefaultHandler),
     giallo_middleware:execute_handler(Handler, Action, Variables, Req, Env).
+
+render_other(Location, DefaultHandler, Variables, Req, Env) ->
+    Action = get_value(action, Location),
+    Handler = get_value(controller, Location, DefaultHandler),
+    render_template(Req, Handler, Action, Variables, [], Env).
 
 redirect_or_move(Status, Location, Headers, Req0) ->
     {ok, Req1} =

@@ -87,7 +87,7 @@ redirect(<<"GET">>, _Pathinfo, _Extra, _Req) ->
     {redirect, <<"http://127.0.0.1:8080/hi/you">>}.
 
 render_other(<<"GET">>, _Pathinfo, _Extra, _Req) ->
-    {render_other, [{action, render_other_landing},
+    {render_other, [{action, hello_world_template},
                     {controller, default_handler}]}.
 
 render_other_landing(<<"GET">>, [], _Extra, _Req) ->
