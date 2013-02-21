@@ -1,4 +1,4 @@
-Giallo
+Giallo [![Build Status](https://travis-ci.org/kivra/giallo.png?branch=master)](https://travis-ci.org/kivra/giallo)
 ======
 
 Giallo (Italian pronunciation: [ˈdʒallo], plural gialli) is an Italian
