@@ -173,7 +173,7 @@ object.
 Possible return values are:
 
 * {ok, Extra}: Extra will get passed as the third argument to the action
-  and as a variable called `before_` to the templates
+  and as a variable called `_before` to the templates
 * {redirect, Location}: Redirect to the `Location` effectively bypassing
   the Action
 
