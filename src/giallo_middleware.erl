@@ -110,11 +110,11 @@ do_get_action(Handler, [ActionName | _]) ->
 unmarshal_before({before, [], Eval}) ->
     Eval;
 unmarshal_before({before, Args, ok}) ->
-    {ok, [{before, Args}]};
+    {ok, [{"_before", Args}]};
 unmarshal_before({before, Args, {ok, Var}}) ->
-    {ok, [{before, Args} | Var]};
+    {ok, [{"_before", Args} | Var]};
 unmarshal_before({before, Args, {ok, Var, Headers}}) ->
-    {ok, [{before, Args} | Var], Headers};
+    {ok, [{"_before", Args} | Var], Headers};
 unmarshal_before(Eval) ->
     Eval.
 
