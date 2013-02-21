@@ -22,7 +22,7 @@ test: ct dialyze doc
 test-build:
 	$(REBAR) -C rebar.test.config compile
 
-ct: clean test-build
+ct: clean deps test-build
 	$(REBAR) -C rebar.test.config ct skip_deps=true
 
 build-plt:
