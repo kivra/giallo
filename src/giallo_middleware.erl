@@ -115,6 +115,10 @@ unmarshal_before({before, Args, {ok, Var}}) ->
     {ok, [{"_before", Args} | Var]};
 unmarshal_before({before, Args, {ok, Var, Headers}}) ->
     {ok, [{"_before", Args} | Var], Headers};
+unmarshal_before({before, Args, {render_other, Location, Var}}) ->
+    {render_other, Location, [{"_before", Args} | Var]};
+unmarshal_before({before, _, Eval}) ->
+    Eval;
 unmarshal_before(Eval) ->
     Eval.
 
