@@ -215,7 +215,7 @@ render_other(Config) ->
     Url = base_url(Config),
     {ok, {Status, Headers, Body}} = httpc:request(Url ++ "render_other"),
     {"HTTP/1.1", 200, "OK"} = Status,
-    "You got rendered!" = Body,
+    "Hello World!\n" = Body,
     {"content-type", "text/html"} = lists:keyfind("content-type", 1, Headers).
 
 redirect(Config) ->
