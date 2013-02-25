@@ -33,6 +33,8 @@
 -export([post_param/3]).
 -export([query_param/2]).
 -export([query_param/3]).
+-export([header/2]).
+-export([header/3]).
 
 %% API ------------------------------------------------------------------------
 
@@ -86,6 +88,21 @@ query_param(Key, Req0) ->
     Default :: any().
 query_param(Key, Req0, Default) ->
     {Value, _Req1} = cowboy_req:qs_val(Key, Req0, Default),
+    Value.
+
+%% @equiv header(Key, Req0, undefined)
+-spec header(Key, Req0) -> binary() | undefined when
+    Key     :: binary(),
+    Req0    :: cowboy_req:req().
+header(Key, Req0) ->
+    header(Key, Req0, undefined).
+
+-spec header(Key, Req0, Default) -> binary() | Default when
+    Key     :: binary(),
+    Req0    :: cowboy_req:req(),
+    Default :: any().
+header(Key, Req0, Default) ->
+    {Value, _Req1} = cowboy_req:header(Key, Req0, Default),
     Value.
 
 %% Private --------------------------------------------------------------------
