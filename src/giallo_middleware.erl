@@ -65,8 +65,8 @@ execute_handler(Handler, ActionName, Arguments, Req0, Env) ->
 
 %% Private --------------------------------------------------------------------
 
-handler_handle(_Handler, undefined, _PathInfo, _Arguments, _Req0, _Env) ->
-    continue;
+handler_handle(Handler, undefined, _PathInfo, _Arguments, _Req0, _Env) ->
+    maybe_continue(Handler);
 handler_handle(Handler, Action, PathInfo, Arguments, Req0, Env) ->
     case maybe_do_before(Handler, Action, Req0, Env) of
         {redirect, _Location} = Redirect ->
@@ -74,7 +74,7 @@ handler_handle(Handler, Action, PathInfo, Arguments, Req0, Env) ->
         {error, 500} = Error ->
             Error;
         {ok, BeforeArgs} ->
-            F = fun() ->
+            F = fun() -> %% Everything seems Ok, execute the handler
                     Parameters = Arguments ++ BeforeArgs,
                     {Method, Req1} = cowboy_req:method(Req0),
                     {before, BeforeArgs, apply(Handler,
@@ -87,7 +87,7 @@ handler_handle(Handler, Action, PathInfo, Arguments, Req0, Env) ->
             ?exported_or_else({Handler, Action, 4},
                               ?lazy(?do_or_error(F, Req0, Handler, Action,
                                                  4, Env)),
-                              ?lazy(continue))
+                              ?lazy(maybe_continue(Handler)))
     end.
 
 get_action(Handler, Req0) ->
@@ -121,6 +121,11 @@ unmarshal_before({before, _, Eval}) ->
     Eval;
 unmarshal_before(Eval) ->
     Eval.
+
+maybe_continue(Handler) ->
+    ?exported_or_else({Handler, init, 3},
+                      ?lazy(continue),
+                      ?lazy({error, 404})).
 
 maybe_do_before(Handler, Action, Req0, Env) ->
     F = ?lazy(apply(Handler, before_, [Action, Req0])),
