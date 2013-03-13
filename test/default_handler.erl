@@ -41,6 +41,7 @@
 -export([before_template/4]).
 -export([query_param/4]).
 -export([post_param/4]).
+-export([action_other/4]).
 -export([render_other/4]).
 -export([render_other_landing/4]).
 -export([extra_req_return/4]).
@@ -61,9 +62,6 @@ terminate(_Reason, _Req, _State) ->
     ok.
 
 %% Giallo callback handlers
-before_(redirect_non_existent_action, _Req) ->
-    {redirect, [{action, render_other_landing},
-                {controller, default_handler}]};
 before_(before_template, _Req) ->
     {ok, [{before_var, <<"Before!">>}]};
 before_(_, _Req) ->
@@ -75,6 +73,10 @@ hi(<<"GET">>, [<<"json">>], _Extra, _Req) ->
     {json, [{<<"jason">>, <<"Ohai!">>}]};
 hi(<<"GET">>, [<<"jsonp">>], _Extra, _Req) ->
     {jsonp, <<"callback">>, [{<<"jason">>, <<"Ohai!">>}]}.
+
+action_other(<<"GET">>, [], _Extra, _Req) ->
+    {action_other, [{action, render_other_landing},
+                    {controller, default_handler}]}.
 
 before_template(<<"GET">>, [], Extra, _Req) ->
     <<"Before!">> = proplists:get_value(before_var, Extra),
