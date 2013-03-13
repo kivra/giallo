@@ -50,7 +50,7 @@
 -export([hello_world/1]).
 -export([hello_world_template/1]).
 -export([hello_world_template_var/1]).
--export([redirect_non_existent_action/1]).
+-export([action_other/1]).
 -export([extra_req_return/1]).
 -export([not_found/1]).
 -export([error_500/1]).
@@ -81,7 +81,7 @@ groups() ->
             render_other,
             post_param,
             query_param,
-            redirect_non_existent_action,
+            action_other,
             error_500
     ],
     [
@@ -204,9 +204,9 @@ moved(Config) ->
                                                   []),
     {"HTTP/1.1",301,"Moved Permanently"} = Status.
 
-redirect_non_existent_action(Config) ->
+action_other(Config) ->
     Url = base_url(Config),
-    {ok, {Status, Headers, Body}} = httpc:request(Url ++ "redirect_non_existent_action"),
+    {ok, {Status, Headers, Body}} = httpc:request(Url ++ "action_other"),
     {"HTTP/1.1", 200, "OK"} = Status,
     "You got rendered!" = Body,
     {"content-type", "text/html"} = lists:keyfind("content-type", 1, Headers).

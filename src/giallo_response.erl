@@ -66,18 +66,17 @@ eval({ok, Variables, Headers}, Req0, Env, Handler, Action) ->
     Response = render_template(Req0, Handler, Action,
                                Variables, Headers, Env),
     eval(Response, Req0, Env, Handler, Action);
-eval({redirect, Location}, Req0, Env, Handler, Action)
-                                                when is_binary(Location) ->
-    eval({redirect, Location, []}, Req0, Env, Handler, Action);
 eval({redirect, Location}, Req0, Env, Handler, Action) ->
-    eval(redirect_other(Location, Handler, [], Req0, Env),
-         Req0, Env, Handler, Action);
+    eval({redirect, Location, []}, Req0, Env, Handler, Action);
 eval({redirect, Location, Headers}, Req0, _, _, _) ->
     redirect_or_move(302, Location, Headers, Req0);
 eval({moved, Location}, Req0, Env, Handler, Action) ->
     eval({moved, Location, []}, Req0, Env, Handler, Action);
 eval({moved, Location, Headers}, Req0, _, _, _) ->
     redirect_or_move(301, Location, Headers, Req0);
+eval({action_other, Location}, Req0, Env, Handler, Action) ->
+    eval(action_other(Location, Handler, [], Req0, Env),
+         Req0, Env, Handler, Action);
 eval({render_other, Location}, Req0, Env, Handler, Action) ->
     eval({render_other, Location, []}, Req0, Env, Handler, Action);
 eval({render_other, Location, Variables}, Req0, Env, Handler, Action) ->
@@ -125,7 +124,7 @@ eval(continue, Req, Env, _, _) ->
 
 %% Private --------------------------------------------------------------------
 
-redirect_other(Location, DefaultHandler, Variables, Req, Env) ->
+action_other(Location, DefaultHandler, Variables, Req, Env) ->
     Action = get_value(action, Location),
     Handler = get_value(controller, Location, DefaultHandler),
     giallo_middleware:execute_handler(Handler, Action, Variables, Req, Env).

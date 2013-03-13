@@ -14,8 +14,8 @@ minimum to implement a basic View-Controller pattern. Yes we've removed
 the Model from MVC, this is not a "everything but the kitchen sink" type of
 framework.
 
-Giallo can be easily embedded and provides some conveinient methods for
-working with Controller and Views while giving possibility to use
+Giallo can easily be embedded and provides some conveinient methods for
+working with Controller and Views while still giving you possibility to use
 standard Cowboy features when necessary.
 
 Examples
@@ -47,10 +47,8 @@ This would map the `my_handler` using standard Cowboy
 [Routing](http://ninenines.eu/docs/en/cowboy/HEAD/guide/routing) to the
 URI `http://yourserver/`. Implementing the action `hi` would make
 Giallo output "Ohai!" when performing a GET on `/hi` or anything
-below `/hi/extra...`., while outputting `OhNo!` when performing a GET on
-anything else. Any action that is implemented explicitly, such as `hi/4`
+below `/hi/extra...`. Any Giallo action that is implemented, such as `hi/4`
 gets precedence over the standard Cowboy Handler.
-
 
 The first argument is the HTTP method being used.
 
@@ -61,7 +59,7 @@ list such as `/hi/extra/path/information` would give a list like
 
 The third argument contains any extra variables that either get passed
 from the cowboy dispatcher or via an other action redispatching using
-`render_other` or from the before_/4 function.
+`action_other` or from the before_/4 function.
 
 The `Req` argument is the standard Cowboy [Request]
 (https://github.com/extend/cowboy/blob/master/src/cowboy_req.erl#L128) Object.
@@ -130,7 +128,7 @@ Giallo uses [ErlyDTL](https://github.com/evanmiller/erlydtl) for
 standard templating. To dispatch a request from a Giallo controller you
 return `ok`, `{ok, Variables}` or `{ok, Variables, Headers}`. Giallo
 will then render the template associated with that controller and
-action. Giallo compounds the name as `<controller>_<action>`.
+action. Giallo compounds the template name as `<controller>_<action>`.
 
 You control how you compile your ErlyDtl templates through rebar. Using
 the `erlydtl_opts` directive you can specify where to find your
@@ -143,6 +141,9 @@ templates:
 ]}.
 
 ```
+
+With these ErlyDTL options you would create your templates such as
+`controller_action.html`
 
 Session Management
 ------------------
@@ -167,51 +168,78 @@ before_(_Action, _Req) ->
 ```
 
 The first parameter is the Action that is to be performed after
-`before_` has been complete. The second parameter is the standard Req
-object.
+`before_` has been complete, it's supplied as an atom, i.e. `action_name`.
+The second parameter is the standard Req object.
 
 Possible return values are:
 
-* {ok, Extra}: Extra will get passed as the third argument to the action
-  and as a variable called `_before` to the templates
-* {redirect, Location}: Redirect to the `Location` effectively bypassing
-  the Action
+#### `{ok, Extra}` ####
+Extra will get passed as the third argument to the action and as a
+variable called `_before` to any template
+
+#### `{redirect, Location}` ####
+Redirect to the `Location` effectively bypassing the Action
 
 Return values
 -------------
 
 Here's a list of possible return values from a Giallo controller:
 
-* ok: Continue and render the template for the corresponding action
-* {ok, Variables::proplist()}: Same as above but pass in `Variables` to
-  the template
-* {ok, Variables::proplist(), Headers::proplist()}: Same as above but
-  also set additional HTTP Headers
-* {redirect, Location::binary() | proplist()}: Send a 302 redirect to the `Location`
-* {redirect, Location, Headers::proplist()}: Same as above but also set
-  additional HTTP Headers
-* {moved, Location::binary() | proplist()}: Send a 301 redirect to the `Location`
-* {moved, Location::binary() | proplist(), Headers::proplist()}: Same as above but also set
-  additional HTTP Headers
-* {render_other, OtherLocationbinary() | ::proplist()}: Render the action and/or
-  view from `Location`. Possible values for `Location` are
-`[{action, your_action}, {controller, your_handler}]` or a binary
-absolute Url
-* {render_other, Location::binary() | ::proplist(), Variables::proplist()}: Same
-  as above but pass `Variables` that can be retrieved from the `Extra`
-  argument
-* {output, Output::binary()}: print out the `Output`
-* {output, Output::binary(), Headers::proplist()}: Same as above but
-  also set additional HTTP Headers
-* {json, Data::proplist()}: Encode the `Data` as json and output
-* {json, Data::proplist(), Headers::proplist()}: Same as above but
-  also set additional HTTP Headers
-* {jsonp, Callback::string(), Data::proplist()}: Encode the `Data` as
-  valid jsonp using the `Callback`
-* {jsonp, Callback::string(), Data::proplist(), Headers::proplist()}: Same as above but
-  also set additional HTTP Headers
-* not_found: Respond with a 404
-* {error, Status::integer()}: Respond with the given error Status Code
+#### `ok` ####
+Continue and render the template for the corresponding action
+
+#### `{ok, Variables::proplist()}` ####
+Same as above but pass `Variables` to the template. Variables can then be outputted in
+the template as `{{ variable_name }}`
+
+#### `{ok, Variables::proplist(), Headers::proplist()}` ###
+Same as above but also set additional HTTP Headers
+
+#### `{redirect, Location::binary() | proplist()}` ###
+Send a 302 redirect to the `Location`
+
+#### `{redirect, Location, Headers::proplist()}` ###
+Same as above but also set additional HTTP Headers
+
+#### `{moved, Location::binary()}` ###
+Send a 301 redirect to the `Location`
+
+#### `{moved, Location::binary(), Headers::proplist()}` ###
+Same as above but also set additional HTTP Headers
+
+#### `{action_other, Location::proplist()}` ###
+ Possible values for `Location` are `[{action, your_action}, {controller, your_handler}]`.
+ If `controller` is ommitted it will assume the current handler.
+
+#### `{render_other, OtherLocation::binary()}` ###
+Render the action and/or view from `Location`.
+
+#### `{render_other, Location::binary(), Variables::proplist()}` ###
+Same as above but pass `Variables` that can be retrieved from the `Extra` argument
+
+#### `{output, Output::binary()}` ###
+print out the `Output`
+
+#### `{output, Output::binary(), Headers::proplist()}` ###
+Same as above but also set additional HTTP Headers
+
+#### `{json, Data::proplist()}` ###
+Encode the `Data` as json and output
+
+#### `{json, Data::proplist(), Headers::proplist()}` ###
+Same as above but also set additional HTTP Headers
+
+#### `{jsonp, Callback::string(), Data::proplist()}` ###
+Encode the `Data` as valid jsonp using the `Callback`
+
+#### `{jsonp, Callback::string(), Data::proplist(), Headers::proplist()}` ###
+Same as above but also set additional HTTP Headers
+
+#### `not_found` ###
+Respond with a 404
+
+#### `{error, Status::integer()}` ###
+Respond with the given error Status Code
 
 ## License
 It's the [MIT license](http://en.wikipedia.org/wiki/MIT_License). So go ahead
