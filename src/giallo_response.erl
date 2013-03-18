@@ -137,7 +137,7 @@ render_other(Location, DefaultHandler, Variables, Req, Env) ->
 redirect_or_move(Status, Location, Headers, Req0) ->
     {ok, Req1} =
         cowboy_req:reply(Status, [{<<"location">>, Location}], Headers, Req0),
-    {halt, Req1}.
+    {halt, cowboy_req:set([{connection, close}, {resp_state, done}], Req1)}.
 
 render_template(Req0, Handler, Action0, Variables, Headers, Env) ->
     F = fun() ->
