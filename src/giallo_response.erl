@@ -162,4 +162,3 @@ get_value(Key, List, Default) ->
         false      -> Default;
         {Key, Val} -> Val
     end.
-
