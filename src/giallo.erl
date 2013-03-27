@@ -29,12 +29,17 @@
 -export([start/1]).
 -export([start/2]).
 -export([stop/0]).
+
+-export([header/2]).
+-export([header/3]).
 -export([post_param/2]).
 -export([post_param/3]).
 -export([query_param/2]).
 -export([query_param/3]).
--export([header/2]).
--export([header/3]).
+-export([multipart_file/2]).
+-export([multipart_param/2]).
+-export([multipart_param/3]).
+-export([multipart_stream/4]).
 
 %% API ------------------------------------------------------------------------
 
@@ -104,6 +109,38 @@ header(Key, Req0) ->
 header(Key, Req0, Default) ->
     {Value, _Req1} = cowboy_req:header(Key, Req0, Default),
     Value.
+
+%% @equiv multipart_param(Key, Req0, undefined)
+-spec multipart_param(Key, Req0) -> binary() | undefined when
+    Key     :: binary(),
+    Req0    :: cowboy_req:req().
+multipart_param(Key, Req0) ->
+    multipart_param(Key, Req0, undefined).
+
+-spec multipart_param(Key, Req0, Default) -> binary() | Default when
+    Key     :: binary(),
+    Req0    :: cowboy_req:req(),
+    Default :: any().
+multipart_param(Key, Req0, Default) ->
+    case giallo_multipart:param(Key, Req0) of
+        undefined -> Default;
+        Value     -> Value
+    end.
+
+-spec multipart_file(Key, Req0) -> {binary(), binary()} | undefined when
+    Key     :: binary(),
+    Req0    :: cowboy_req:req().
+multipart_file(Key, Req0) ->
+    giallo_multipart:file(Key, Req0).
+
+-spec multipart_stream(Key, Fun, State, Req0) ->
+                                {binary(), binary()} | undefined when
+    Key     :: binary(),
+    Fun     :: fun(),
+    State   :: any(),
+    Req0    :: cowboy_req:req().
+multipart_stream(Key, Fun, State, Req0) ->
+    giallo_multipart:stream_param(Key, Fun, State, Req0).
 
 %% Private --------------------------------------------------------------------
 
