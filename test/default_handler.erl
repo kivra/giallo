@@ -76,7 +76,7 @@ hi(<<"GET">>, [<<"jsonp">>], _Extra, _Req) ->
 
 action_other(<<"GET">>, [], _Extra, _Req) ->
     {action_other, [{action, render_other_landing},
-                    {controller, default_handler}]}.
+                    {controller, <<"default_handler">>}]}.
 
 before_template(<<"GET">>, [], Extra, _Req) ->
     <<"Before!">> = proplists:get_value(before_var, Extra),
