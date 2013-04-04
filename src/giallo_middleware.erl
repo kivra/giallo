@@ -24,6 +24,15 @@
 %%
 %% ----------------------------------------------------------------------------
 
+%% @doc Giallo middleware.
+%%
+%% This module is implemented as a Cowboy middleware and checks if a given
+%% request should be handled by a Giallo handler. If so it executes that
+%% handler and evaluates the response. If Giallo determines that it shouldn't
+%% execute the handler it will hand it off to Cowboy or return 404 depending
+%% on if the handler implements the correct Cowboy behavior or not.
+%% @end
+
 -module(giallo_middleware).
 -behaviour(cowboy_middleware).
 

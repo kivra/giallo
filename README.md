@@ -195,10 +195,10 @@ the template as `{{ variable_name }}`
 #### `{ok, Variables::proplist(), Headers::proplist()}` ###
 Same as above but also set additional HTTP Headers
 
-#### `{redirect, Location::binary() | proplist()}` ###
+#### `{redirect, Location::binary()` ###
 Send a 302 redirect to the `Location`
 
-#### `{redirect, Location, Headers::proplist()}` ###
+#### `{redirect, Location::binary(), Headers::proplist()}` ###
 Same as above but also set additional HTTP Headers
 
 #### `{moved, Location::binary()}` ###
@@ -208,14 +208,18 @@ Send a 301 redirect to the `Location`
 Same as above but also set additional HTTP Headers
 
 #### `{action_other, Location::proplist()}` ###
- Possible values for `Location` are `[{action, your_action}, {controller, your_handler}]`.
- If `controller` is ommitted it will assume the current handler.
+Possible values for `Location` are `[{action, your_action}, {controller, your_handler}]`.
+If `controller` is ommitted it will assume the current handler.
 
-#### `{render_other, OtherLocation::binary()}` ###
-Render the action and/or view from `Location`.
+#### `{render_other,  Location::proplist()}` ###
+Render the action and/or view from `Location`. Possible values for `Location`
+are `[{action, your_action}, {controller, your_handler}]`.
+If `controller` is ommitted it will assume the current handler.
 
-#### `{render_other, Location::binary(), Variables::proplist()}` ###
+#### `{render_other,  Location::proplist(), Variables::proplist()}` ###
 Same as above but pass `Variables` that can be retrieved from the `Extra` argument
+Possible values for `Location` are `[{action, your_action}, {controller, your_handler}]`.
+If `controller` is ommitted it will assume the current handler.
 
 #### `{output, Output::binary()}` ###
 print out the `Output`
