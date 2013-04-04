@@ -34,9 +34,10 @@
 
 %% API ------------------------------------------------------------------------
 
-%% @doc Returns the value of a multipart parameter, or undefined if not found.
-%% @private
--spec param(binary(), cowboy_req:req()) -> undefined | binary().
+%% @doc Returns the value of a multipart request, or undefined if not found.
+-spec param(Param, Req) -> undefined | binary() when
+    Param :: binary(),
+    Req   :: cowboy_req:req().
 param(Param, Req) ->
     stream_param(Param,
                      fun(eof, _Meta, Acc) ->
@@ -55,9 +56,12 @@ param(Param, Req) ->
 %% When the end of the part is reached, Fun is called with Fragment
 %% set to the atom "eof".
 %% @end
--spec stream_param(binary(), fun(), StateTy, cowboy_req:req())
-                      -> undefined | StateTy when
-      StateTy :: any().
+-spec stream_param(Name, Fun, StateTy, Req) -> undefined | StateTy when
+    Name   :: binary(),
+    Fun    :: fun(),
+    State0 :: any(),
+    Req    :: cowboy_req:req(),
+    State0 :: any().
 stream_param(Name, Fun, State0, Req) ->
     case find_multipart(Name, cowboy_req:multipart_data(Req)) of
         {ok, {Meta, Req2}} ->
@@ -74,7 +78,11 @@ stream_param(Name, Fun, State0, Req) ->
 %% Returns {Filename, Body}, where Filename is the result of decoding
 %% the "filename" part of the Content-Disposition header.
 %% @end
--spec file(binary(), cowboy_req:req()) -> {binary(), binary()}.
+-spec file(Param, Req) -> {Filename, Body} when
+    Param    :: binary(),
+    Req      :: cowboy_req:req(),
+    Filename :: binary(),
+    Body     :: binary().
 file(Param, Req) ->
     stream_param(Param,
                  fun(eof, Meta, Acc) ->
@@ -98,7 +106,8 @@ file(Param, Req) ->
 %% @private
 -spec find_multipart(Target, Part) -> Result when
       Target :: binary(),
-      Part   :: {{headers, [tuple()]}, cowboy_req:req()} | {eof, cowboy_req:req()},
+      Part   :: {{headers, [tuple()]}, cowboy_req:req()}
+              | {eof, cowboy_req:req()},
       Result :: undefined | {[tuple()], cowboy_req:req()}.
 find_multipart(Target, {headers, Headers, Req}) ->
     {<<"content-disposition">>, ContentDisposition} =
@@ -125,14 +134,19 @@ find_multipart(_Target, {eof, _Req}) ->
 %% fragment received, returning the result of the last function invocation.
 %% @end
 %% @private
--spec read_multipart(fun(), any(), [tuple()], Part) -> any() when
-      Part :: {{body, binary()}, cowboy_req:req()} | {end_of_part, cowboy_req:req()}.
+-spec read_multipart(Fun, State, Meta, Part) -> any() when
+    Fun   :: fun(),
+    State :: any(),
+    Meta  :: [tuple()],
+    Part  :: {headers, cowboy_http:headers(), cowboy_req:req()}
+           | {body, binary(), cowboy_req:req()}
+           | {end_of_part | eof, cowboy_req:req()}.
 read_multipart(Fun, State, Meta, {body, Body, Req}) ->
     State2 = Fun(Body, Meta, State),
     read_multipart(
-      Fun,
-      State2,
-      Meta,
-      cowboy_req:multipart_data(Req));
+        Fun,
+        State2,
+        Meta,
+        cowboy_req:multipart_data(Req));
 read_multipart(Fun, State, Meta, {end_of_part, _Req}) ->
     Fun(eof, Meta, State).

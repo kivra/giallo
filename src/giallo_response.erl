@@ -24,14 +24,20 @@
 %%
 %% ----------------------------------------------------------------------------
 
+%% @doc Handle Giallo's returntypes.
+%%
+%% This module provides one function <em>eval/5</em> which evaluates any
+%% return value from a Giallo handler.
+%% @end
+
 -module(giallo_response).
 
 -export([eval/5]).
 
 -include("giallo.hrl").
 
--type eval_action() :: ok | redirect | moved | render_other | stream | json |
-                       jsonp | output | not_found | error.
+-type eval_action() :: ok | redirect | moved | action_other | render_other |
+                       stream | json | jsonp | output | not_found | error.
 -type eval() :: ok | continue | {eval_action(), any(), any(), any()} |
                 {eval_action(), any()} | {eval_action(), any(), any()} |
                 {eval_action(), any(), any(), any()}.
@@ -56,7 +62,7 @@ eval({EvalAction, X, Req1}, _, Env, Handler, Action) when is_tuple(Req1) ->
 eval({EvalAction, X, Y, Req1}, _, Env, Handler, Action) when is_tuple(Req1) ->
     eval({EvalAction, X, Y}, Req1, Env, Handler, Action);
 eval({EvalAction, X, Y, Z, Req1}, _, Env, Handler, Action)
-                                                        when is_tuple(Req1) ->
+                                                when is_tuple(Req1) ->
     eval({EvalAction, X, Y, Z}, Req1, Env, Handler, Action);
 eval(ok, Req0, Env, Handler, Action) ->
     eval({ok, []}, Req0, Env, Handler, Action);
@@ -66,13 +72,17 @@ eval({ok, Variables, Headers}, Req0, Env, Handler, Action) ->
     Response = render_template(Req0, Handler, Action,
                                Variables, Headers, Env),
     eval(Response, Req0, Env, Handler, Action);
-eval({redirect, Location}, Req0, Env, Handler, Action) ->
+eval({redirect, Location}, Req0, Env, Handler, Action)
+                                                when is_binary(Location) ->
     eval({redirect, Location, []}, Req0, Env, Handler, Action);
-eval({redirect, Location, Headers}, Req0, _, _, _) ->
+eval({redirect, Location, Headers}, Req0, _, _, _)
+                                                when is_binary(Location) ->
     redirect_or_move(302, Location, Headers, Req0);
-eval({moved, Location}, Req0, Env, Handler, Action) ->
+eval({moved, Location}, Req0, Env, Handler, Action)
+                                                when is_binary(Location) ->
     eval({moved, Location, []}, Req0, Env, Handler, Action);
-eval({moved, Location, Headers}, Req0, _, _, _) ->
+eval({moved, Location, Headers}, Req0, _, _, _)
+                                                when is_binary(Location) ->
     redirect_or_move(301, Location, Headers, Req0);
 eval({action_other, Location}, Req0, Env, Handler, Action) ->
     eval(action_other(Location, Handler, [], Req0, Env),
@@ -125,8 +135,9 @@ eval(continue, Req, Env, _, _) ->
 %% Private --------------------------------------------------------------------
 
 action_other(Location, DefaultHandler, Variables, Req, Env) ->
-    Action = get_value(action, Location),
-    Handler = get_value(controller, Location, DefaultHandler),
+    Action = ?any_to_existing_atom(get_value(action, Location)),
+    Handler = ?any_to_existing_atom(get_value(controller, Location,
+                                              DefaultHandler)),
     giallo_middleware:execute_handler(Handler, Action, Variables, Req, Env).
 
 render_other(Location, DefaultHandler, Variables, Req, Env) ->
