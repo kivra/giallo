@@ -24,12 +24,4 @@
 %%
 %% ----------------------------------------------------------------------------
 
--define(lazy(X), fun() -> X end).
-
--define(do_or_else(F, E), giallo_util:do_or_else(F, E)).
-
--define(do_or_error(A, B, C, D, E, F), giallo_util:do_or_error(A, B, C, D, E, F)).
-
--define(exported_or_else(X, F, E), giallo_util:exported_or_else(X, F, E)).
-
--define(any_to_existing_atom(X), giallo_util:any_to_existing_atom(X)).
+-define(any2ea(X), giallo_util:any_to_existing_atom(X)).
