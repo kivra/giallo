@@ -43,8 +43,8 @@
                 {eval_action(), any(), any(), any()}.
 
 -define(DEFAULT_CT, [{<<"content-type">>, <<"text/html">>}]).
--define(JSON_CT, [{<<"content-type">>, <<"application/json">>}]).
--define(JS_CT, [{<<"content-type">>, <<"application/javascript">>}]).
+-define(JSON_CT,    [{<<"content-type">>, <<"application/json">>}]).
+-define(JS_CT,      [{<<"content-type">>, <<"application/javascript">>}]).
 
 %% API ------------------------------------------------------------------------
 
@@ -69,9 +69,8 @@ eval(ok, Req0, Env, Handler, Action) ->
 eval({ok, Variables}, Req0, Env, Handler, Action) ->
     eval({ok, Variables, []}, Req0, Env, Handler, Action);
 eval({ok, Variables, Headers}, Req0, Env, Handler, Action) ->
-    Response = render_template(Req0, Handler, Action,
-                               Variables, Headers, Env),
-    eval(Response, Req0, Env, Handler, Action);
+    eval(render_template(Req0, Handler, Action, Variables, Headers, Env)
+        , Req0, Env, Handler, Action);
 eval({redirect, Location}, Req0, Env, Handler, Action)
                                                 when is_binary(Location) ->
     eval({redirect, Location, []}, Req0, Env, Handler, Action);
@@ -102,21 +101,25 @@ eval({json, Data}, Req0, Env, Handler, Action) ->
 eval({json, Data, []}, Req0, Env, Handler, Action) ->
     eval({json, Data, ?JSON_CT}, Req0, Env, Handler, Action);
 eval({json, Data, Headers}, Req0, Env, Handler, Action) ->
-    F = ?lazy({output, jsx:encode(Data), Headers}),
-    eval(?do_or_error(F, Req0, jsx, encode, 1, Env),
-         Req0, Env, Handler, Action);
+    try eval({output, jsx:encode(Data), Headers}, Req0, Env, Handler, Action)
+    catch Class:Reason ->
+        eval(giallo_util:error(jsx, encode, 1, Class, Reason, Env, Req0
+                               , erlang:get_stacktrace()), Req0, Env
+                               , Handler, Action)
+    end;
 eval({jsonp, Callback, Data}, Req0, Env, Handler, Action) ->
     eval({jsonp, Callback, Data, []}, Req0, Env, Handler, Action);
 eval({jsonp, Callback, Data, []}, Req0, Env, Handler, Action) ->
     eval({jsonp, Callback, Data, ?JS_CT}, Req0, Env, Handler, Action);
 eval({jsonp, Callback, Data, Headers}, Req0, Env, Handler, Action) ->
-    F = fun() ->
-            JsonData = jsx:encode(Data),
-            Payload = <<Callback/binary, "(", JsonData/binary, ");">>,
-            {output, Payload, Headers}
-    end,
-    eval(?do_or_error(F, Req0, jsx, encode, 1, Env),
-         Req0, Env, Handler, Action);
+    try
+        eval({output, <<Callback/binary,"(",(jsx:encode(Data))/binary,");">>
+              , Headers}, Req0, Env, Handler, Action)
+    catch Class:Reason ->
+        eval(giallo_util:error(jsx, encode, 1, Class, Reason, Env, Req0
+                               , erlang:get_stacktrace()), Req0, Env
+                               , Handler, Action)
+    end;
 eval({output, Output}, Req0, Env, Handler, Action) ->
     eval({output, Output, []}, Req0, Env, Handler, Action);
 eval({output, Output, []}, Req0, Env, Handler, Action) ->
@@ -135,41 +138,42 @@ eval(continue, Req, Env, _, _) ->
 %% Private --------------------------------------------------------------------
 
 action_other(Location, DefaultHandler, Variables, Req, Env) ->
-    Action = ?any_to_existing_atom(get_value(action, Location)),
-    Handler = ?any_to_existing_atom(get_value(controller, Location,
-                                              DefaultHandler)),
-    giallo_middleware:execute_handler(Handler, Action, Variables, Req, Env).
+    giallo_middleware:execute_handler(
+        ?any2ea(get_value(controller, Location, DefaultHandler))
+        , get_value(action, Location)
+        , Variables, Req, Env).
 
 render_other(Location, DefaultHandler, Variables, Req, Env) ->
-    Action = get_value(action, Location),
-    Handler = get_value(controller, Location, DefaultHandler),
-    render_template(Req, Handler, Action, Variables, [], Env).
+    render_template(Req, get_value(controller, Location, DefaultHandler)
+                   , get_value(action, Location), Variables, [], Env).
 
 redirect_or_move(Status, Location, Headers, Req0) ->
-    {ok, Req1} =
-        cowboy_req:reply(Status, [{<<"location">>, Location}], Headers, Req0),
-    {halt, cowboy_req:set([{connection, close}, {resp_state, done}], Req1)}.
+    {halt, cowboy_req:set([{connection, close}, {resp_state, done}]
+    , unwrap(cowboy_req:reply(Status, [{<<"location">>, Location}]
+    , Headers, Req0)))}.
 
-render_template(Req0, Handler, Action0, Variables, Headers, Env) ->
-    F = fun() ->
-            Action1 = atom_to_list(Action0),
-            Prefix = atom_to_list(Handler),
-            Template = list_to_existing_atom(Prefix++"_"++Action1++"_dtl"),
-            case code:ensure_loaded(Template) of
-                {module, Template} ->
-                    {ok, Response} = apply(Template, render, [Variables]),
-                    {output, Response, Headers};
-                {error, _Reason} ->
-                    continue
-            end
-    end,
-    ?do_or_error(F, Req0, erlydtl, render, 1, Env).
+render_template(Req0, Handler, Action, Arguments, Headers, Env) ->
+    try
+        case code:ensure_loaded(?any2ea(atom_to_list(Handler)
+                                        ++"_"++atom_to_list(Action)++"_dtl"))
+        of
+            {module, Template} ->
+                {output,
+                    unwrap(apply(Template, render, [Arguments])), Headers};
+            {error, _Reason}   -> continue
+        end
+    catch Class:Reason ->
+       giallo_util:error(Handler, Action, erlang:length(Arguments),
+                          Class, Reason, Env, Req0, erlang:get_stacktrace())
+    end.
 
-get_value(Key, List) ->
-    get_value(Key, List, undefined).
+get_value(Key, List) -> get_value(Key, List, undefined).
 
 get_value(Key, List, Default) ->
     case lists:keyfind(Key, 1, List) of
         false      -> Default;
         {Key, Val} -> Val
     end.
+
+unwrap({ok, Val}) -> Val;
+unwrap(Val)       -> Val.

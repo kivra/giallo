@@ -43,17 +43,63 @@
 
 %% API ------------------------------------------------------------------------
 
+%% @doc This function is called from Cowboy for every request. For every call
+%%      it will check to see if it should execute a Giallo handler, or
+%%      transparently pass on to Cowboy. The flow of control is:
+%%
+%%      <pre>
+%%      Cowboy
+%%        |
+%%      Giallo ({@link giallo_middleware:execute/2})
+%%        |
+%%      Is handler valid?
+%%        |  \ no
+%%        |   - Hand over the control to Cowboy to 404 it
+%%        |
+%%        | yes
+%%      Is action valid?
+%%        |  \ no
+%%        |   \
+%%        |    - Is the index_/4 action valid?
+%%        |    | \ no
+%%        |    |  \
+%%        |    |   - Is the handler a valid Cowboy handler?
+%%        |    |   |  \ no
+%%        |    |   |   \
+%%        |    |   |    - Return a 404
+%%        |    |   |
+%%        |    | Hand over control to Cowboy to continue processing
+%%        |    |
+%%        |  Execute(*) the index_/4 action and render the result
+%%        |
+%%      Execute(*) the action and render the result
+%%
+%%      (*) Look to see if before_/4 should be executed
+%%      </pre>
 -spec execute(Req0, Env) ->
     {ok, Req, Env} | {error, 500, Req} | {halt, Req} when
     Req0 :: cowboy_req:req()
     ,Req :: cowboy_req:req()
     ,Env :: cowboy_middleware:env().
 execute(Req0, Env) ->
-    {handler, Handler} = lists:keyfind(handler, 1, Env),
+    {handler, Handler}        = lists:keyfind(handler, 1, Env),
     {handler_opts, Arguments} = lists:keyfind(handler_opts, 1, Env),
-    {Req1, Action} = get_action(Handler, Req0),
-    execute_handler(Handler, Action, Arguments, Req1, Env).
+    {Extra, Req1}             = giallo_util:get_extra(Req0),
+    {Action, Req2}            = giallo_util:get_action(Req1),
 
+    {ValidAction, Eval} =
+        case {valid_handler(Handler)
+             , valid_action(Handler, Action)
+             , valid_action(Handler, index_)} of
+            {true, true, _}      -> run(Handler, Action, Extra, Arguments
+                                        , Req2, Env);
+            {true, false, true}  -> run(Handler, index_, Extra, Arguments
+                                        , Req2, Env);
+            {true, false, false} -> {non_existent_action
+                                     , maybe_cowboy_continue(Handler)};
+            {false, _, _}        -> {non_existent_action, continue}
+        end,
+    giallo_response:eval(Eval, Req2, Env, Handler, ValidAction).
 
 -spec execute_handler(Handler, Action, Arguments, Req0, Env) ->
     {ok, Req, Env} | {error, 500, Req} | {halt, Req} when
@@ -63,88 +109,92 @@ execute(Req0, Env) ->
     ,Req0      :: cowboy_req:req()
     ,Req       :: cowboy_req:req()
     ,Env       :: cowboy_middleware:env().
-execute_handler(Handler, ActionName, Arguments, Req0, Env) ->
-    {PathInfo, Req1} = cowboy_req:path_info(Req0),
-    Extra = get_extra(PathInfo),
-    Action = do_get_action(Handler, [ActionName]),
-    giallo_response:eval(unmarshal_before(handler_handle(Handler, Action,
-                                                         Extra, Arguments,
-                                                         Req1, Env)),
-                         Req1, Env, Handler, Action).
+execute_handler(Handler, Action, Arguments, Req0, Env) ->
+    {Extra, Req1} = giallo_util:get_extra(Req0),
+
+    {ValidAction, Eval} =
+        case {valid_handler(Handler), valid_action(Handler, Action)} of
+            {true, true}  -> run(Handler, Action, Extra, Arguments, Req1, Env);
+            {true, false} -> {non_existent_action, {error, 404}};
+            {false, _}    -> {non_existent_action, continue}
+        end,
+    giallo_response:eval(Eval, Req1, Env, Handler, ValidAction).
 
 %% Private --------------------------------------------------------------------
 
-handler_handle(Handler, undefined, _PathInfo, _Arguments, _Req0, _Env) ->
-    maybe_continue(Handler);
-handler_handle(Handler, Action, PathInfo, Arguments, Req0, Env) ->
-    case maybe_do_before(Handler, Action, Req0, Env) of
-        {redirect, _Location} = Redirect ->
-            Redirect;
-        {error, 500} = Error ->
-            Error;
-        {ok, BeforeArgs} ->
-            F = fun() -> %% Everything seems Ok, execute the handler
-                    Parameters = Arguments ++ BeforeArgs,
-                    {Method, Req1} = cowboy_req:method(Req0),
-                    {before, BeforeArgs, apply(Handler,
-                                               Action,
-                                               [Method,
-                                                PathInfo,
+run(Handler, Action0, Extra, Arguments, Req0, Env) ->
+    Action1 = ?any2ea(Action0),
+    Eval =
+        case maybe_do_before(Handler, [Action1, Env], Req0, Env) of
+            {redirect, _Location} = Redirect ->
+                Redirect;
+            {error, 500} = Error ->
+                Error;
+            {ok, BeforeArgs} ->
+                %% Everything seems Ok, execute the handler
+                Parameters = Arguments ++ BeforeArgs,
+                {Method, Req1} = cowboy_req:method(Req0),
+                HandlerReturn = handler_handle(Handler, Action1, [Method,
+                                                Extra,
                                                 Parameters,
-                                                Req1])}
-            end,
-            ?exported_or_else({Handler, Action, 4},
-                              ?lazy(?do_or_error(F, Req0, Handler, Action,
-                                                 4, Env)),
-                              ?lazy(maybe_continue(Handler)))
+                                                Req1], Req1, Env),
+                {before, BeforeArgs, HandlerReturn}
+        end,
+    {Action1, unmarshal_before(Eval)}.
+
+valid_handler(Handler) ->
+    case code:ensure_loaded(Handler) of
+        {module, Handler}  -> true;
+        {error, _Reason}   -> false
     end.
 
-get_action(Handler, Req0) ->
-    {PathInfo, Req1} = cowboy_req:path_info(Req0),
-    {Req1, do_get_action(Handler, PathInfo)}.
+valid_action(_Handler, non_existent_action) ->
+    false;
+valid_action(Handler, Action) ->
+    try
+        %% if there exist an exported function in the running VM with the name
+        %% <em>Action</em> that would get converted to an atom. If not an
+        %% erlang bad arg would get thrown and we need to catch that not to
+        %% crash the current Cowboy process.
+        erlang:function_exported(Handler, ?any2ea(Action), 4)
+    catch _:_ ->
+        false
+    end.
 
-do_get_action(Handler, undefined) ->
-    do_get_action(Handler, [<<"index_">>]);
-do_get_action(Handler, []) ->
-    do_get_action(Handler, [<<"index_">>]);
-do_get_action(Handler, [ActionName | _]) ->
-    F = fun() ->
-            case code:ensure_loaded(Handler) of
-                {module, Handler}  -> ?any_to_existing_atom(ActionName);
-                {error, _Reason}   -> undefined
-            end
-    end,
-    ?do_or_else(F, fun(_) -> undefined end).
+%% @doc Validate if the Handler is indeed a Cowboy handler, if so pass over
+%% control to Cowboy, else return 404.
+maybe_cowboy_continue(Handler) ->
+    case [F || {F, A} <- [{init, 3}, {handle, 2}, {terminate, 3}]
+         , erlang:function_exported(Handler, F, A) =/= true]
+    of
+        []  -> continue;
+        _ -> {error, 404}
+    end.
+
+handler_handle(Handler, Action, Arguments, Req0, Env) ->
+    try apply(Handler, Action, Arguments)
+    catch Class:Reason ->
+        giallo_util:error(Handler, Action, erlang:length(Arguments),
+                          Class, Reason, Env, Req0, erlang:get_stacktrace())
+    end.
 
 unmarshal_before({before, [], Eval}) ->
     Eval;
 unmarshal_before({before, Args, ok}) ->
-    {ok, [{"_before", Args}]};
+    {ok, [{<<"_before">>, Args}]};
 unmarshal_before({before, Args, {ok, Var}}) ->
-    {ok, [{"_before", Args} | Var]};
+    {ok, [{<<"_before">>, Args} | Var]};
 unmarshal_before({before, Args, {ok, Var, Headers}}) ->
-    {ok, [{"_before", Args} | Var], Headers};
+    {ok, [{<<"_before">>, Args} | Var], Headers};
 unmarshal_before({before, Args, {render_other, Location, Var}}) ->
-    {render_other, Location, [{"_before", Args} | Var]};
+    {render_other, Location, [{<<"_before">>, Args} | Var]};
 unmarshal_before({before, _, Eval}) ->
     Eval;
 unmarshal_before(Eval) ->
     Eval.
 
-maybe_continue(Handler) ->
-    ?exported_or_else({Handler, init, 3},
-                      ?lazy(continue),
-                      ?lazy({error, 404})).
-
-maybe_do_before(Handler, Action, Req0, Env) ->
-    F = ?lazy(apply(Handler, before_, [Action, Req0])),
-    ?exported_or_else({Handler, before_, 2},
-                      ?lazy(?do_or_error(F, Req0, Handler, before_, 2, Env)),
-                      ?lazy({ok, []})).
-
-get_extra([]) ->
-    [];
-get_extra(undefined) ->
-    [];
-get_extra(PathInfo) ->
-    tl(PathInfo).
+maybe_do_before(Handler, Arguments, Req0, Env) ->
+    case erlang:function_exported(Handler, before_, 2) of
+        true  -> handler_handle(Handler, before_, Arguments, Req0, Env);
+        false -> {ok, []}
+    end.
