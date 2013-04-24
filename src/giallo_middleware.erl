@@ -125,7 +125,7 @@ execute_handler(Handler, Action, Arguments, Req0, Env) ->
 run(Handler, Action0, Extra, Arguments, Req0, Env) ->
     Action1 = ?any2ea(Action0),
     Eval =
-        case maybe_do_before(Handler, [Action1, Env], Req0, Env) of
+        case maybe_do_before(Handler, [Action1, Req0], Req0, Env) of
             {redirect, _Location} = Redirect ->
                 Redirect;
             {error, 500} = Error ->
