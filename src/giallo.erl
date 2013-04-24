@@ -54,20 +54,20 @@
 
 %% API ------------------------------------------------------------------------
 
--spec start(Dispatch) -> ok | {error, Reason} when
+-spec start(Dispatch) -> {ok, pid()} | {error, Reason} when
     Dispatch :: cowboy_router:routes(),
     Reason   :: term().
 start(Dispatch) ->
     start(Dispatch, []).
 
--spec start(Dispatch, Env) -> ok | {error, Reason} when
+-spec start(Dispatch, Env) -> {ok, pid()} | {error, Reason} when
     Dispatch :: cowboy_router:routes(),
     Env      :: proplists:proplist(),
     Reason   :: term().
 start(Dispatch, Env) ->
     CompiledDispatch = cowboy_router:compile(Dispatch),
-    {ok, Acceptors} = get_env(acceptors, Env),
-    {ok, Port} = get_env(port, Env),
+    {ok, Acceptors}  = get_env(acceptors, Env),
+    {ok, Port}       = get_env(port, Env),
     cowboy:start_http(giallo_http_listener, Acceptors, [{port, Port}], [
             {env, [{dispatch, CompiledDispatch}]},
             {middlewares, [cowboy_router, giallo_middleware,
@@ -80,9 +80,10 @@ stop() ->
     application:stop(giallo).
 
 %% @equiv post_param(Key, Req0, undefined)
--spec post_param(Key, Req0) -> binary() | undefined | true when
+-spec post_param(Key, Req0) -> Result when
     Key     :: binary(),
-    Req0    :: cowboy_req:req().
+    Req0    :: cowboy_req:req(),
+    Result  :: binary() | undefined | true | {error, atom()}.
 post_param(Key, Req0) ->
     post_param(Key, Req0, undefined).
 
@@ -90,10 +91,11 @@ post_param(Key, Req0) ->
 %% Return a named parameter from a HTTP POST or <em>Default</em> if not found,
 %% see <em>query_param/2</em> for query parameter retrieving.
 %% @end
--spec post_param(Key, Req0, Default) -> binary() | Default | true when
+-spec post_param(Key, Req0, Default) -> Result  when
     Key     :: binary(),
     Req0    :: cowboy_req:req(),
-    Default :: any().
+    Default :: any(),
+    Result  :: binary() | Default | true | {error, atom()}.
 post_param(Key, Req0, Default) ->
     case cowboy_req:body_qs(Req0) of
         {error, _Reason} = E -> E;
@@ -151,6 +153,7 @@ multipart_param(Key, Req0) ->
 
 %% @doc
 %% Returns the value of a multipart request, or Default if not found.
+%% @end
 -spec multipart_param(Key, Req0, Default) -> binary() | Default when
     Key     :: binary(),
     Req0    :: cowboy_req:req(),
