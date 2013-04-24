@@ -164,11 +164,9 @@ valid_action(Handler, Action) ->
 %% @doc Validate if the Handler is indeed a Cowboy handler, if so pass over
 %% control to Cowboy, else return 404.
 maybe_cowboy_continue(Handler) ->
-    case [F || {F, A} <- [{init, 3}, {handle, 2}, {terminate, 3}]
-         , erlang:function_exported(Handler, F, A) =/= true]
-    of
-        []  -> continue;
-        _ -> {error, 404}
+    case erlang:function_exported(Handler, init, 3) of
+        true  -> continue;
+        false -> {error, 404}
     end.
 
 handler_handle(Handler, Action, Arguments, Req0, Env) ->
