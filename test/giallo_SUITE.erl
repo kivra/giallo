@@ -40,6 +40,7 @@
 -export([minimal/1]).
 -export([moved/1]).
 -export([redirect/1]).
+-export([stream/1]).
 -export([query_param/1]).
 -export([post_param/1]).
 -export([hi_world/1]).
@@ -70,6 +71,7 @@ groups() ->
             hi_json,
             hi_jsonp,
             hi_world,
+            stream,
             moved,
             redirect,
             hello_world,
@@ -196,6 +198,12 @@ hi_jsonp(Config) ->
     "callback({\"jason\":\"Ohai!\"});" = Body,
     {"content-type", "application/javascript"} =
                                     lists:keyfind("content-type", 1, Headers).
+
+stream(Config) ->
+    Url = base_url(Config),
+    {ok, {Status, _Headers, Body}} = httpc:request(Url ++ "stream"),
+    {"HTTP/1.1", 200, "OK"} = Status,
+    "HelloHelloHello" = Body.
 
 moved(Config) ->
     Url = base_url(Config),

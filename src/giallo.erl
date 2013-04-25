@@ -37,6 +37,8 @@
 
 -module(giallo).
 
+-include("giallo.hrl").
+
 -export([start/1]).
 -export([start/2]).
 -export([stop/0]).
@@ -52,14 +54,29 @@
 -export([multipart_param/3]).
 -export([multipart_stream/4]).
 
+-opaque giallo_req() :: #g{}.
+-export_type([giallo_req/0]).
+
 %% API ------------------------------------------------------------------------
 
+%% @equiv start(Dispatch, [])
 -spec start(Dispatch) -> {ok, pid()} | {error, Reason} when
     Dispatch :: cowboy_router:routes(),
     Reason   :: term().
 start(Dispatch) ->
     start(Dispatch, []).
 
+%% @doc
+%% Start Giallo with the given routes and an options proplist with
+%% arguments for Giallo. Optional arguments would be one of:
+%% <dl>
+%% <dt>acceptors:</dt>
+%%   <dd>Number of acceptors that Cowboy should start,
+%%       Default:<em>[{acceptors, 100}]</em></dd>
+%% <dt>port:</dt>
+%%   <dd>The port on which Giallo should listen to,
+%%       Default: <em>[{port, 8080}]</em></dd>
+%% </dl>
 -spec start(Dispatch, Env) -> {ok, pid()} | {error, Reason} when
     Dispatch :: cowboy_router:routes(),
     Env      :: proplists:proplist(),
@@ -74,6 +91,7 @@ start(Dispatch, Env) ->
                            cowboy_handler]}
             ]).
 
+%% @doc Stop Giallo
 -spec stop() -> ok | {error, Reason} when
     Reason :: term().
 stop() ->
@@ -90,7 +108,6 @@ post_param(Key, Req0) ->
 %% @doc
 %% Return a named parameter from a HTTP POST or <em>Default</em> if not found,
 %% see <em>query_param/2</em> for query parameter retrieving.
-%% @end
 -spec post_param(Key, Req0, Default) -> Result  when
     Key     :: binary(),
     Req0    :: cowboy_req:req(),
@@ -116,7 +133,6 @@ query_param(Key, Req0) ->
 %% @doc
 %% Return a named parameter from the querystring or <em>Default</em>
 %% if not found, see <em>post_param/2</em> for HTTP POST parameter retrieving.
-%% @end
 -spec query_param(Key, Req0, Default) -> binary() | Default | true when
     Key     :: binary(),
     Req0    :: cowboy_req:req(),
@@ -135,7 +151,6 @@ header(Key, Req0) ->
 %% @doc
 %% Return a named HTTP Header from the Request or <em>Default</em>
 %% if not found.
-%% @end
 -spec header(Key, Req0, Default) -> binary() | Default when
     Key     :: binary(),
     Req0    :: cowboy_req:req(),
@@ -153,7 +168,6 @@ multipart_param(Key, Req0) ->
 
 %% @doc
 %% Returns the value of a multipart request, or Default if not found.
-%% @end
 -spec multipart_param(Key, Req0, Default) -> binary() | Default when
     Key     :: binary(),
     Req0    :: cowboy_req:req(),
@@ -168,7 +182,6 @@ multipart_param(Key, Req0, Default) ->
 %% Locates a multipart field named Param, assumed to contain a file.
 %% Returns {Filename, Body}, where Filename is the result of decoding
 %% the "filename" part of the Content-Disposition header.
-%% @end
 -spec multipart_file(Key, Req0) -> {binary(), binary()} | undefined when
     Key     :: binary(),
     Req0    :: cowboy_req:req().
@@ -182,7 +195,6 @@ multipart_file(Key, Req0) ->
 %% and State is a user-specified updated on each call to Fun.
 %% When the end of the part is reached, Fun is called with Fragment
 %% set to the atom "eof".
-%% @end
 -spec multipart_stream(Key, Fun, State, Req0) ->
                                 {binary(), binary()} | undefined when
     Key     :: binary(),
