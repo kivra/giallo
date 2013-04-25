@@ -27,7 +27,7 @@
 {application, giallo,
  [
   {description, "a small flexible web framework"},
-  {vsn, "0.0.1"},
+  {vsn, "0.1.0"},
   {registered, []},
   {applications, [
                   kernel,

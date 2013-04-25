@@ -86,6 +86,9 @@ eval({moved, Location, Headers}, Req0, _, _, _)
 eval({action_other, Location}, Req0, Env, Handler, Action) ->
     eval(action_other(Location, Handler, [], Req0, Env),
          Req0, Env, Handler, Action);
+eval({action_other, _Location, _Variables}, _Req0, _Env, _Handler, _Action) ->
+    % TODO: Implement
+    implement;
 eval({render_other, Location}, Req0, Env, Handler, Action) ->
     eval({render_other, Location, []}, Req0, Env, Handler, Action);
 eval({render_other, Location, Variables}, Req0, Env, Handler, Action) ->

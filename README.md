@@ -1,4 +1,4 @@
-Giallo [![Build Status](https://travis-ci.org/kivra/giallo.png?branch=master)](https://travis-ci.org/kivra/giallo)
+Giallo (v0.1.0) [![Build Status](https://travis-ci.org/kivra/giallo.png?branch=master)](https://travis-ci.org/kivra/giallo)
 ======
 
 Giallo (Italian pronunciation: [ˈdʒallo], plural gialli) is an Italian
@@ -212,13 +212,14 @@ Possible values for `Location` are `[{action, your_action}, {controller, your_ha
 If `controller` is ommitted it will assume the current handler.
 
 #### `{render_other,  Location::proplist()}` ###
-Render the action and/or view from `Location`. Possible values for `Location`
-are `[{action, your_action}, {controller, your_handler}]`.
+Render the view associated with the Action at `Location`. Possible values
+for `Location` are `[{action, your_action}, {controller, your_handler}]`.
 If `controller` is ommitted it will assume the current handler.
 
 #### `{render_other,  Location::proplist(), Variables::proplist()}` ###
-Same as above but pass `Variables` that can be retrieved from the `Extra` argument
-Possible values for `Location` are `[{action, your_action}, {controller, your_handler}]`.
+Same as above but pass `Variables` that can be retrieved in the
+template. Possible values for `Location` are
+`[{action, your_action}, {controller, your_handler}]`.
 If `controller` is ommitted it will assume the current handler.
 
 #### `{output, Output::binary()}` ###
