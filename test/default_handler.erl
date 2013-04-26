@@ -37,6 +37,7 @@
 -export([before_/2]).
 -export([hi/4]).
 -export([moved/4]).
+-export([stream/4]).
 -export([redirect/4]).
 -export([before_template/4]).
 -export([query_param/4]).
@@ -84,6 +85,15 @@ before_template(<<"GET">>, [], Extra, _Req) ->
 
 moved(<<"GET">>, _Pathinfo, _Extra, _Req) ->
     {moved, <<"http://127.0.0.1:8080/hi/you">>}.
+
+stream(<<"GET">>, _Pathinfo, _Extra, _Req) ->
+    F = fun(Acc) ->
+            case Acc =:= 3 of
+                true  -> done;
+                false -> {output, <<"Hello">>, Acc+1}
+            end
+    end,
+    {stream, F, 0}.
 
 redirect(<<"GET">>, _Pathinfo, _Extra, _Req) ->
     {redirect, <<"http://127.0.0.1:8080/hi/you">>}.

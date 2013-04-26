@@ -32,34 +32,32 @@
 
 -module(giallo_util).
 
--export([error/8]).
+-include("giallo.hrl").
+
+-export([error/5]).
 -export([get_extra/1]).
 -export([get_action/1]).
--export([any_to_existing_atom/1]).
+-export([any2ea/1]).
 
 %% API ------------------------------------------------------------------------
 
 %% @doc Print a Giallo error using error_logger
--spec error(Handler, Action, Arity, Class, Reason, Env, Req, Stacktrace) ->
-    Error when
-    Handler     :: module()
-    ,Action     :: atom()
+-spec error(GialloReq, Arity, Class, Reason, Stack) -> Error when
+    GialloReq   :: giallo:giallo_req()
     ,Arity      :: non_neg_integer()
     ,Class      :: term()
     ,Reason     :: term()
-    ,Env        :: cowboy_middleware:env()
-    ,Req        :: cowboy_req:req()
-    ,Stacktrace :: term()
+    ,Stack      :: term()
     ,Error      :: {error, 500}.
-error(Handler, Action, Arity, Class, Reason, Env, Req, Stacktrace) ->
+error(#g{handler=H, action=A, req=R, env=Env}, Arity, Class, Reason, Stack) ->
     error_logger:error_msg(
                 "** Giallo handler ~p terminating in ~p/~p~n"
                 "   for the reason ~p:~p~n"
                 "** Handler state was ~p~n"
                 "** Request was ~p~n"
                 "** Stacktrace: ~p~n~n",
-                [Handler, Action, Arity, Class, Reason, Env,
-                    cowboy_req:to_list(Req), Stacktrace]),
+                [H, A, Arity, Class, Reason, Env,
+                    cowboy_req:to_list(R), Stack]),
     {error, 500}.
 
 %% @doc Tries to extract the current action from a Cowboy Req-object.
@@ -87,14 +85,12 @@ get_extra(Req0) ->
     {PathInfo, Req1} = cowboy_req:path_info(Req0),
     {do_get_extra(PathInfo), Req1}.
 
--spec any_to_existing_atom(Any) -> AnyAtom when
+-spec any2ea(Any) -> AnyAtom when
     Any      :: list() | binary() | atom()
     ,AnyAtom :: atom().
-any_to_existing_atom(A) when is_atom(A)   -> A;
-any_to_existing_atom(L) when is_list(L)   ->
-    any_to_existing_atom(list_to_existing_atom(L));
-any_to_existing_atom(B) when is_binary(B) ->
-    any_to_existing_atom(binary_to_list(B)).
+any2ea(A) when is_atom(A)   -> A;
+any2ea(L) when is_list(L)   -> any2ea(list_to_existing_atom(L));
+any2ea(B) when is_binary(B) -> any2ea(binary_to_list(B)).
 
 %% Private --------------------------------------------------------------------
 

@@ -1,4 +1,4 @@
-Giallo (v0.1.0) [![Build Status](https://travis-ci.org/kivra/giallo.png?branch=master)](https://travis-ci.org/kivra/giallo)
+Giallo (v0.2.0) [![Build Status](https://travis-ci.org/kivra/giallo.png?branch=master)](https://travis-ci.org/kivra/giallo)
 ======
 
 Giallo (Italian pronunciation: [ˈdʒallo], plural gialli) is an Italian
@@ -183,7 +183,11 @@ Redirect to the `Location` effectively bypassing the Action
 Return values
 -------------
 
-Here's a list of possible return values from a Giallo controller:
+Here's a list of possible return values from a Giallo controller.
+
+All return values can take an optional `Req :: cowboy_req:req()` as the last
+parameter. This is especially useful if you need to set anything special
+to the response, like cookies, sessions, etc.
 
 #### `ok` ####
 Continue and render the template for the corresponding action
@@ -211,6 +215,10 @@ Same as above but also set additional HTTP Headers
 Possible values for `Location` are `[{action, your_action}, {controller, your_handler}]`.
 If `controller` is ommitted it will assume the current handler.
 
+#### `{action_other, Location::proplist(), Variables::proplist()}` ###
+Same as above but pass `Variables` that can be retrieved from the
+controller.
+
 #### `{render_other,  Location::proplist()}` ###
 Render the view associated with the Action at `Location`. Possible values
 for `Location` are `[{action, your_action}, {controller, your_handler}]`.
@@ -226,6 +234,27 @@ If `controller` is ommitted it will assume the current handler.
 print out the `Output`
 
 #### `{output, Output::binary(), Headers::proplist()}` ###
+Same as above but also set additional HTTP Headers
+
+#### `{stream, Generator::function(), Acc0::any()}` ###
+Stream a response to the client using HTTP chunked encoding. For each chunk,
+the Generator function is passed an accumulator (initally Acc0) and should
+return either {output, Data, Acc1} or done. I.e:
+
+```erlang
+
+stream(<<"GET">>, _Pathinfo, _Extra, _Req) ->
+    F = fun(Acc) ->
+            case Acc =:= 3 of
+                true  -> done;
+                false -> {output, <<"Hello\n">>, Acc+1}
+            end
+    end,
+    {stream, F, 0}.
+
+```
+
+#### `{stream, Generator::function(), Acc::any(), Headers::proplist()}` ###
 Same as above but also set additional HTTP Headers
 
 #### `{json, Data::proplist()}` ###
@@ -245,6 +274,13 @@ Respond with a 404
 
 #### `{error, Status::integer()}` ###
 Respond with the given error Status Code
+
+Request processing
+-------------
+
+There is some conventience-functions for working with headers,
+querystrings, multipart-data, etc. Please look in the
+[API-docs](doc) for reference.
 
 ## License
 It's the [MIT license](http://en.wikipedia.org/wiki/MIT_License). So go ahead

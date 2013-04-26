@@ -39,7 +39,7 @@
 -include("giallo.hrl").
 
 -export([execute/2]).
--export([execute_handler/5]).
+-export([execute_handler/1]).
 
 %% API ------------------------------------------------------------------------
 
@@ -86,113 +86,105 @@ execute(Req0, Env) ->
     {handler_opts, Arguments} = lists:keyfind(handler_opts, 1, Env),
     {Extra, Req1}             = giallo_util:get_extra(Req0),
     {Action, Req2}            = giallo_util:get_action(Req1),
+    {Method, Req3}            = cowboy_req:method(Req2),
+    GialloReq                 = #g{ req=Req3, env=Env, handler=Handler
+                                  , action=Action, extra=Extra
+                                  , args=Arguments, method=Method },
 
-    {ValidAction, Eval} =
-        case {valid_handler(Handler)
-             , valid_action(Handler, Action)
-             , valid_action(Handler, index_)} of
-            {true, true, _}      -> run(Handler, Action, Extra, Arguments
-                                        , Req2, Env);
-            {true, false, true}  -> run(Handler, index_, Extra, Arguments
-                                        , Req2, Env);
-            {true, false, false} -> {non_existent_action
-                                     , maybe_cowboy_continue(Handler)};
-            {false, _, _}        -> {non_existent_action, continue}
-        end,
-    giallo_response:eval(Eval, Req2, Env, Handler, ValidAction).
+    giallo_response:eval(
+        case {valid_handler(GialloReq)
+             , valid_action(GialloReq)
+             , valid_action(GialloReq#g{action=index_})} of
+            {true, true, _}      -> run(GialloReq);
+            {true, false, true}  -> run(GialloReq#g{action=index_});
+            {true, false, false} -> maybe_continue(GialloReq);
+            {false, _, _}        -> continue(GialloReq)
+        end).
 
--spec execute_handler(Handler, Action, Arguments, Req0, Env) ->
+-spec execute_handler(GialloReq) ->
     {ok, Req, Env} | {error, 500, Req} | {halt, Req} when
-    Handler    :: module()
-    ,Action    :: atom()
-    ,Arguments :: proplists:proplist()
-    ,Req0      :: cowboy_req:req()
-    ,Req       :: cowboy_req:req()
-    ,Env       :: cowboy_middleware:env().
-execute_handler(Handler, Action, Arguments, Req0, Env) ->
+    GialloReq :: giallo:giallo_req()
+    ,Req      :: cowboy_req:req()
+    ,Env      :: cowboy_middleware:env().
+execute_handler(#g{ req=Req0 } = GialloReq0) ->
     {Extra, Req1} = giallo_util:get_extra(Req0),
+    GialloReq1    = GialloReq0#g{ extra=Extra, req=Req1 },
 
-    {ValidAction, Eval} =
-        case {valid_handler(Handler), valid_action(Handler, Action)} of
-            {true, true}  -> run(Handler, Action, Extra, Arguments, Req1, Env);
-            {true, false} -> {non_existent_action, {error, 404}};
-            {false, _}    -> {non_existent_action, continue}
-        end,
-    giallo_response:eval(Eval, Req1, Env, Handler, ValidAction).
+    giallo_response:eval(
+        case {valid_handler(GialloReq1), valid_action(GialloReq1)} of
+            {true, true}  -> run(GialloReq1);
+            {true, false} -> notfound(GialloReq1);
+            {false, _}    -> continue(GialloReq1)
+        end).
 
 %% Private --------------------------------------------------------------------
 
-run(Handler, Action0, Extra, Arguments, Req0, Env) ->
-    Action1 = ?any2ea(Action0),
-    Eval =
-        case maybe_do_before(Handler, [Action1, Req0], Req0, Env) of
-            {redirect, _Location} = Redirect ->
-                Redirect;
-            {error, 500} = Error ->
-                Error;
-            {ok, BeforeArgs} ->
-                %% Everything seems Ok, execute the handler
-                Parameters = Arguments ++ BeforeArgs,
-                {Method, Req1} = cowboy_req:method(Req0),
-                HandlerReturn = handler_handle(Handler, Action1, [Method,
-                                                Extra,
-                                                Parameters,
-                                                Req1], Req1, Env),
-                {before, BeforeArgs, HandlerReturn}
-        end,
-    {Action1, unmarshal_before(Eval)}.
+-spec run(giallo:giallo_req()) -> giallo:giallo_req().
+run(#g{ args=Args, action=Action, method=Method
+                                , req=Req, extra=Extra }=GialloReq0 ) ->
+    GialloReq1 = GialloReq0#g{ action=giallo_util:any2ea(Action) },
+    case maybe_do_before(GialloReq1) of
+        {ok, BeforeArgs} ->
+            GialloReq1#g{ before_args=BeforeArgs
+                        , resp={before, handler_handle(GialloReq1#g{
+                                                        args=[ Method
+                                                             , Extra
+                                                             , Args
+                                                             ++ BeforeArgs
+                                                             , Req] })} };
+        BeforeResponse -> GialloReq1#g{ resp=BeforeResponse }
+    end.
 
-valid_handler(Handler) ->
+-spec valid_handler(giallo:giallo_req()) -> boolean().
+valid_handler(#g{ handler = Handler }) ->
     case code:ensure_loaded(Handler) of
         {module, Handler}  -> true;
         {error, _Reason}   -> false
     end.
 
-valid_action(_Handler, non_existent_action) ->
+-spec valid_action(giallo:giallo_req()) -> boolean().
+valid_action(#g{ action=non_existent_action }) ->
     false;
-valid_action(Handler, Action) ->
+valid_action(#g{ handler=Handler, action=Action }) ->
     try
         %% if there exist an exported function in the running VM with the name
         %% <em>Action</em> that would get converted to an atom. If not an
         %% erlang bad arg would get thrown and we need to catch that not to
         %% crash the current Cowboy process.
-        erlang:function_exported(Handler, ?any2ea(Action), 4)
+        erlang:function_exported(Handler, giallo_util:any2ea(Action), 4)
     catch _:_ ->
         false
     end.
 
 %% @doc Validate if the Handler is indeed a Cowboy handler, if so pass over
 %% control to Cowboy, else return 404.
-maybe_cowboy_continue(Handler) ->
+-spec maybe_continue(giallo:giallo_req()) -> giallo:giallo_req().
+maybe_continue(#g{ handler=Handler }=GialloReq) ->
     case erlang:function_exported(Handler, init, 3) of
-        true  -> continue;
-        false -> {error, 404}
+        true  -> continue(GialloReq);
+        false -> notfound(GialloReq)
     end.
 
-handler_handle(Handler, Action, Arguments, Req0, Env) ->
-    try apply(Handler, Action, Arguments)
+-spec notfound(giallo:giallo_req()) -> giallo:giallo_req().
+notfound(GialloReq) ->
+    GialloReq#g{ resp={error, 404} }.
+
+-spec continue(giallo:giallo_req()) -> giallo:giallo_req().
+continue(GialloReq) ->
+    GialloReq#g{ action=non_existent_action, resp=continue }.
+
+handler_handle(#g{ handler=Handler, action=Action, args=Args }=GialloReq) ->
+    try apply(Handler, Action, Args)
     catch Class:Reason ->
-        giallo_util:error(Handler, Action, erlang:length(Arguments),
-                          Class, Reason, Env, Req0, erlang:get_stacktrace())
+        giallo_util:error(GialloReq, erlang:length(Args), Class
+                         , Reason, erlang:get_stacktrace())
     end.
 
-unmarshal_before({before, [], Eval}) ->
-    Eval;
-unmarshal_before({before, Args, ok}) ->
-    {ok, [{<<"_before">>, Args}]};
-unmarshal_before({before, Args, {ok, Var}}) ->
-    {ok, [{<<"_before">>, Args} | Var]};
-unmarshal_before({before, Args, {ok, Var, Headers}}) ->
-    {ok, [{<<"_before">>, Args} | Var], Headers};
-unmarshal_before({before, Args, {render_other, Location, Var}}) ->
-    {render_other, Location, [{<<"_before">>, Args} | Var]};
-unmarshal_before({before, _, Eval}) ->
-    Eval;
-unmarshal_before(Eval) ->
-    Eval.
-
-maybe_do_before(Handler, Arguments, Req0, Env) ->
+maybe_do_before(#g{ handler=Handler }=GialloReq) ->
     case erlang:function_exported(Handler, before_, 2) of
-        true  -> handler_handle(Handler, before_, Arguments, Req0, Env);
+        true  ->
+            handler_handle(GialloReq#g{ action=before_
+                                      , args=[ GialloReq#g.action
+                                             , GialloReq#g.req ] });
         false -> {ok, []}
     end.
