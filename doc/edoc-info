@@ -1,0 +1,5 @@
+%% encoding: UTF-8
+{application,giallo}.
+{packages,[]}.
+{modules,[giallo,giallo_app,giallo_middleware,giallo_multipart,
+          giallo_response,giallo_sup,giallo_util]}.

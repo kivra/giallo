@@ -24,4 +24,15 @@
 %%
 %% ----------------------------------------------------------------------------
 
--define(any2ea(X), giallo_util:any_to_existing_atom(X)).
+%% A Giallo record carrying all the information needed to handle a request
+-record(g,
+        { req                :: cowboy_req:req()        %cowboy Request Obj
+        , env                :: cowboy_middleware:env() %cowboy Env Obj
+        , handler=undefined  :: atom()                  %current handler
+        , action=undefined   :: atom() | binary()       %action to be executed
+        , extra=[]           :: list()                  %extra URL fragments
+        , args=[]            :: list()                  %extra arguments
+        , before_args=[]     :: list()                  %Arguments from before_
+        , resp=undefined     :: undefined | any()       %payload
+        , method=undefined   :: undefined | binary()    %method of invocation
+        }).
