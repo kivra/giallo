@@ -47,6 +47,7 @@
 -export([header/3]).
 -export([post_param/2]).
 -export([post_param/3]).
+-export([post_param/4]).
 -export([query_param/2]).
 -export([query_param/3]).
 -export([multipart_file/2]).
@@ -105,16 +106,31 @@ stop() ->
 post_param(Key, Req0) ->
     post_param(Key, Req0, undefined).
 
-%% @doc
-%% Return a named parameter from a HTTP POST or <em>Default</em> if not found,
-%% see <em>query_param/2</em> for query parameter retrieving.
--spec post_param(Key, Req0, Default) -> Result  when
+%% @equiv post_param(Key, Req0, Default, 16000)
+-spec post_param(Key, Req0, Default) -> Result when
     Key     :: binary(),
     Req0    :: cowboy_req:req(),
     Default :: any(),
-    Result  :: binary() | Default | true | {error, atom()}.
+    Result  :: binary() | undefined | true | {error, atom()}.
 post_param(Key, Req0, Default) ->
-    case cowboy_req:body_qs(Req0) of
+    post_param(Key, Req0, Default, 16000).
+
+%% @doc
+%% Return a named parameter from a HTTP POST or <em>Default</em> if not found,
+%% see <em>query_param/2</em> for query parameter retrieving.
+%%
+%% There's a default limit on body post size on 16kb, if that limit is
+%% exceeded a <em>{error, badlength}</em> will get returned. You can
+%% optionally pass in an other value for <em>MaxBodyLength</em> or the atom
+%% <em>infinity</em> to bypass size constraints
+-spec post_param(Key, Req0, Default, MaxBodyLength) -> Result  when
+    Key           :: binary(),
+    Req0          :: cowboy_req:req(),
+    Default       :: any(),
+    MaxBodyLength :: non_neg_integer() | infinity,
+    Result        :: binary() | Default | true | {error, atom()}.
+post_param(Key, Req0, Default, MaxBodyLength) ->
+    case cowboy_req:body_qs(MaxBodyLength, Req0) of
         {error, _Reason} = E -> E;
         {ok, ValueList, _Req1}      ->
             case lists:keyfind(Key, 1, ValueList) of
