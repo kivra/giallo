@@ -98,11 +98,13 @@ start(Dispatch, Env) ->
 stop() ->
     application:stop(giallo).
 
+%% Req Convenience functions --------------------------------------------------
+
 %% @equiv post_param(Key, Req0, undefined)
 -spec post_param(Key, Req0) -> Result when
     Key     :: binary(),
     Req0    :: cowboy_req:req(),
-    Result  :: binary() | undefined | true | {error, atom()}.
+    Result  :: {binary() | undefined, cowboy_req:req()} | {error, atom()}.
 post_param(Key, Req0) ->
     post_param(Key, Req0, undefined).
 
@@ -111,7 +113,7 @@ post_param(Key, Req0) ->
     Key     :: binary(),
     Req0    :: cowboy_req:req(),
     Default :: any(),
-    Result  :: binary() | undefined | true | {error, atom()}.
+    Result  :: {binary() | undefined, cowboy_req:req()} | {error, atom()}.
 post_param(Key, Req0, Default) ->
     post_param(Key, Req0, Default, 16000).
 
@@ -128,37 +130,38 @@ post_param(Key, Req0, Default) ->
     Req0          :: cowboy_req:req(),
     Default       :: any(),
     MaxBodyLength :: non_neg_integer() | infinity,
-    Result        :: binary() | Default | true | {error, atom()}.
+    Result        :: {binary() | Default, cowboy_req:req()} | {error, atom()}.
 post_param(Key, Req0, Default, MaxBodyLength) ->
     case cowboy_req:body_qs(MaxBodyLength, Req0) of
-        {error, _Reason} = E -> E;
-        {ok, ValueList, _Req1}      ->
+        {error, _Reason} = E  -> E;
+        {ok, ValueList, Req1} ->
             case lists:keyfind(Key, 1, ValueList) of
-                {Key, Value} -> Value;
-                false -> Default
+                {Key, Value} -> {Value, Req1};
+                false        -> {Default, Req1}
             end
     end.
 
 %% @equiv query_param(Key, Req0, undefined)
--spec query_param(Key, Req0) -> binary() | undefined | true when
+-spec query_param(Key, Req0) -> Result when
     Key     :: binary(),
-    Req0    :: cowboy_req:req().
+    Req0    :: cowboy_req:req(),
+    Result  :: {binary() | undefined, cowboy_req:req()}.
 query_param(Key, Req0) ->
     query_param(Key, Req0, undefined).
 
 %% @doc
 %% Return a named parameter from the querystring or <em>Default</em>
 %% if not found, see <em>post_param/2</em> for HTTP POST parameter retrieving.
--spec query_param(Key, Req0, Default) -> binary() | Default | true when
+-spec query_param(Key, Req0, Default) -> Result when
     Key     :: binary(),
     Req0    :: cowboy_req:req(),
-    Default :: any().
+    Default :: any(),
+    Result  :: {binary() | Default, cowboy_req:req()}.
 query_param(Key, Req0, Default) ->
-    {Value, _Req1} = cowboy_req:qs_val(Key, Req0, Default),
-    Value.
+    cowboy_req:qs_val(Key, Req0, Default).
 
 %% @equiv header(Key, Req0, undefined)
--spec header(Key, Req0) -> binary() | undefined when
+-spec header(Key, Req0) -> {binary() | undefined, cowboy_req:req()} when
     Key     :: binary(),
     Req0    :: cowboy_req:req().
 header(Key, Req0) ->
@@ -167,13 +170,13 @@ header(Key, Req0) ->
 %% @doc
 %% Return a named HTTP Header from the Request or <em>Default</em>
 %% if not found.
--spec header(Key, Req0, Default) -> binary() | Default when
+-spec header(Key, Req0, Default) -> Result when
     Key     :: binary(),
     Req0    :: cowboy_req:req(),
-    Default :: any().
+    Default :: any(),
+    Result  :: {binary() | Default, cowboy_req:req()}.
 header(Key, Req0, Default) ->
-    {Value, _Req1} = cowboy_req:header(Key, Req0, Default),
-    Value.
+    cowboy_req:header(Key, Req0, Default).
 
 %% @equiv multipart_param(Key, Req0, undefined)
 -spec multipart_param(Key, Req0) -> binary() | undefined when

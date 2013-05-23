@@ -279,8 +279,12 @@ Request processing
 -------------
 
 There is some conventience-functions for working with headers,
-querystrings, multipart-data, etc. Please look in the
-[API-docs](doc) for reference.
+querystrings, multipart-data, etc. Please generate and look at the docs:
+```
+
+make doc
+
+```
 
 ## License
 It's the [MIT license](http://en.wikipedia.org/wiki/MIT_License). So go ahead
