@@ -132,12 +132,15 @@ post_param(Key, Req0, Default) ->
     MaxBodyLength :: non_neg_integer() | infinity,
     Result        :: {binary() | Default, cowboy_req:req()} | {error, atom()}.
 post_param(Key, Req0, Default, MaxBodyLength) ->
-    case cowboy_req:body_qs(MaxBodyLength, Req0) of
-        {error, _Reason} = E  -> E;
-        {ok, ValueList, Req1} ->
-            case lists:keyfind(Key, 1, ValueList) of
-                {Key, Value} -> {Value, Req1};
-                false        -> {Default, Req1}
+    case cowboy_req:body(MaxBodyLength, Req0) of
+        {error, _} = E     -> E;
+        {ok, Buffer, Req1} ->
+            BodyQs = cowboy_http:x_www_form_urlencoded(Buffer),
+            Req2   = cowboy_req:set([{buffer, Buffer}], Req1),
+            Req3   = cowboy_req:set([{body_state, waiting}], Req2),
+            case lists:keyfind(Key, 1, BodyQs) of
+                {Key, Value} -> {Value, Req3};
+                false        -> {Default, Req3}
             end
     end.
 
