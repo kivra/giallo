@@ -5,6 +5,14 @@ Giallo (Italian pronunciation: [ˈdʒallo], plural gialli) is an Italian
 20th-century genre of literature and film, which in Italian indicates crime
 fiction and mystery.
 
+Giallo is released under the terms of the [MIT](http://en.wikipedia.org/wiki/MIT_License) license
+
+Current stable version: [0.2.0](https://github.com/kivra/giallo/tree/0.2.0)
+
+Current α alpha version: [0.3.0](https://github.com/kivra/giallo)
+
+copyright 2012-2013 Kivra
+
 Goals
 -----
 
@@ -279,8 +287,12 @@ Request processing
 -------------
 
 There is some conventience-functions for working with headers,
-querystrings, multipart-data, etc. Please look in the
-[API-docs](doc) for reference.
+querystrings, multipart-data, etc. Please generate and look at the docs:
+```
+
+make doc
+
+```
 
 ## License
 It's the [MIT license](http://en.wikipedia.org/wiki/MIT_License). So go ahead

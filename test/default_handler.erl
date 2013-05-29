@@ -105,14 +105,14 @@ render_other(<<"GET">>, _Pathinfo, _Extra, _Req) ->
 render_other_landing(<<"GET">>, [], _Extra, _Req) ->
     {output, <<"You got rendered!">>}.
 
-query_param(<<"GET">>, [], _Extra, Req) ->
-    <<"b">> = giallo:query_param(<<"a">>, Req),
-    <<"d">> = giallo:query_param(<<"c">>, Req),
+query_param(<<"GET">>, [], _Extra, Req0) ->
+    {<<"b">>, Req1} = giallo:query_param(<<"a">>, Req0),
+    {<<"d">>, _Req2} = giallo:query_param(<<"c">>, Req1),
     {output, <<"Ok!">>}.
 
-post_param(<<"POST">>, [], _Extra, Req) ->
-    <<"b">> = giallo:post_param(<<"a">>, Req),
-    <<"d">> = giallo:post_param(<<"c">>, Req),
+post_param(<<"POST">>, [], _Extra, Req0) ->
+    {<<"b">>, Req1} = giallo:post_param(<<"a">>, Req0),
+    {<<"d">>, _Req2} = giallo:post_param(<<"c">>, Req1),
     {output, <<"Ok!">>}.
 
 not_found(<<"GET">>, _Pathinfo, _Extra, _Req) ->
